@@ -112,7 +112,14 @@ export function validateTextLength(text: string): boolean {
  * Uses common English words frequency check
  */
 export function isEnglish(text: string): boolean {
+  // PDFs/DOCX extraction often includes punctuation, smart quotes, and odd whitespace.
+  // Normalize to improve reliability of this heuristic.
   const lowerText = text.toLowerCase();
+  // Keep letters/spaces only to avoid missing matches like "the," or "and."
+  const normalized = lowerText
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   
   // Common English words that should appear in any English document
   const commonEnglishWords = [
@@ -123,7 +130,7 @@ export function isEnglish(text: string): boolean {
   
   // Count how many common English words appear
   let englishWordCount = 0;
-  const words = lowerText.split(/\s+/);
+  const words = normalized.split(" ").filter(Boolean);
   const totalWords = words.length;
   
   for (const word of words) {
@@ -132,11 +139,14 @@ export function isEnglish(text: string): boolean {
     }
   }
   
-  // If at least 10% of words are common English words, consider it English
-  // This is a simple heuristic that works well for contracts
+  // If enough words are common English words, consider it English.
+  // NOTE: Offer letters can be heavy on names/dates, so we use a tolerant threshold.
   const englishRatio = totalWords > 0 ? englishWordCount / totalWords : 0;
-  
-  return englishRatio >= 0.08; // 8% threshold
+
+  // Also require a minimum amount of tokenized words so tiny/garbled outputs don't pass.
+  if (totalWords < 40) return false;
+
+  return englishRatio >= 0.04; // 4% threshold
 }
 
 /**
