@@ -3,13 +3,30 @@ import { FileText, Upload as UploadIcon, X, ArrowRight, FileCheck } from "lucide
 import { Button } from "@/components/ui/button";
 import { useNavigate, Link } from "react-router-dom";
 import { useDocumentStore } from "@/hooks/useDocumentAnalysis";
+import { validateFile, FileValidationError, ALLOWED_EXTENSIONS, MAX_FILE_SIZE_MB } from "@/lib/fileValidation";
+import ValidationError from "@/components/ValidationError";
 
 const UploadPage = () => {
   const navigate = useNavigate();
   const [localFile, setLocalFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showDocTypeModal, setShowDocTypeModal] = useState(false);
+  const [validationError, setValidationError] = useState<FileValidationError>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const { setFile } = useDocumentStore();
+
+  const handleFileValidation = useCallback((file: File): boolean => {
+    setValidationError(null);
+    
+    const error = validateFile(file);
+    if (error) {
+      setValidationError(error);
+      setLocalFile(null);
+      return false;
+    }
+    
+    return true;
+  }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -24,27 +41,42 @@ const UploadPage = () => {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
+    
     const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile && (droppedFile.type === "application/pdf" || droppedFile.name.endsWith(".doc") || droppedFile.name.endsWith(".docx"))) {
+    if (!droppedFile) return;
+    
+    if (handleFileValidation(droppedFile)) {
       setLocalFile(droppedFile);
     }
-  }, []);
+  }, [handleFileValidation]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
+    if (!selectedFile) return;
+    
+    if (handleFileValidation(selectedFile)) {
       setLocalFile(selectedFile);
     }
+    
+    // Reset input so same file can be selected again
+    e.target.value = '';
+  };
+
+  const handleRemoveFile = () => {
+    setLocalFile(null);
+    setValidationError(null);
   };
 
   const handleAnalyze = () => {
+    if (!localFile) return;
     setShowDocTypeModal(true);
   };
 
   const handleDocTypeConfirm = () => {
-    if (localFile) {
-      setFile(localFile);
-    }
+    if (!localFile) return;
+    
+    setIsProcessing(true);
+    setFile(localFile);
     setShowDocTypeModal(false);
     navigate("/processing");
   };
@@ -74,6 +106,13 @@ const UploadPage = () => {
             We'll analyze it and give you a clear explanation
           </p>
 
+          {/* Validation Error */}
+          {validationError && (
+            <div className="mb-6">
+              <ValidationError type={validationError} />
+            </div>
+          )}
+
           {/* Upload area */}
           <div
             onDragOver={handleDragOver}
@@ -85,7 +124,9 @@ const UploadPage = () => {
                 ? "border-primary bg-sage/30" 
                 : localFile 
                   ? "border-primary/50 bg-sage/20" 
-                  : "border-border hover:border-primary/30 hover:bg-card"
+                  : validationError
+                    ? "border-destructive/50 bg-destructive/5"
+                    : "border-border hover:border-primary/30 hover:bg-card"
               }
             `}
           >
@@ -101,7 +142,7 @@ const UploadPage = () => {
                   </p>
                 </div>
                 <button
-                  onClick={() => setLocalFile(null)}
+                  onClick={handleRemoveFile}
                   className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <X className="w-4 h-4" />
@@ -120,13 +161,14 @@ const UploadPage = () => {
                   or click to browse
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  PDF or DOC • Max size: 10MB
+                  {ALLOWED_EXTENSIONS.join(', ').toUpperCase().replace(/\./g, '')} • Max size: {MAX_FILE_SIZE_MB}MB
                 </p>
                 <input
                   type="file"
-                  accept=".pdf,.doc,.docx"
+                  accept={ALLOWED_EXTENSIONS.join(',')}
                   onChange={handleFileSelect}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  disabled={isProcessing}
                 />
               </>
             )}
@@ -135,9 +177,14 @@ const UploadPage = () => {
           {/* Analyze button */}
           {localFile && (
             <div className="mt-8 text-center">
-              <Button variant="hero" size="xl" onClick={handleAnalyze}>
-                Analyze Contract
-                <ArrowRight className="w-5 h-5 ml-2" />
+              <Button 
+                variant="hero" 
+                size="xl" 
+                onClick={handleAnalyze}
+                disabled={isProcessing}
+              >
+                {isProcessing ? "Processing..." : "Analyze Contract"}
+                {!isProcessing && <ArrowRight className="w-5 h-5 ml-2" />}
               </Button>
             </div>
           )}
