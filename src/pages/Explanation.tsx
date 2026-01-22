@@ -1,46 +1,26 @@
-import { useState } from "react";
-import { FileText, Copy, Download, Check, Lock } from "lucide-react";
+import { useState, useEffect } from "react";
+import { FileText, Copy, Download, Check, Lock, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-
-const explanationSections = [
-  {
-    title: "What this contract is",
-    content: "This is a Service Agreement between you (the Client) and a software development company (the Provider). It establishes terms for ongoing software development services, including building, maintaining, and updating web applications.",
-  },
-  {
-    title: "Who is involved",
-    content: "Two parties are involved: You, as the Client receiving the services, and ABC Software Solutions Inc., as the Provider delivering the development work. The contract also mentions a Project Manager who will serve as your primary point of contact.",
-  },
-  {
-    title: "What you are agreeing to",
-    content: "You agree to pay for software development services on a monthly retainer basis. The Provider will deliver development work according to agreed-upon specifications. You're also agreeing to provide timely feedback and necessary access to complete the work.",
-  },
-  {
-    title: "Money & payments",
-    content: "Monthly retainer: $5,000 due on the 1st of each month. Additional work beyond scope: $150/hour. Payment terms: Net 15 days. Late payments incur 1.5% monthly interest. All amounts in USD.",
-  },
-  {
-    title: "Duration & termination",
-    content: "Initial term: 12 months starting from the signing date. Auto-renewal: Renews annually unless either party gives 60 days written notice. Either party can terminate with 30 days written notice after the initial term.",
-  },
-  {
-    title: "Risks & red flags",
-    content: "⚠️ Non-compete clause: You cannot hire the Provider's employees for 12 months after contract ends.\n⚠️ Intellectual property: Provider retains rights to reusable code components.\n⚠️ Liability cap: Limited to fees paid in the last 3 months.",
-  },
-  {
-    title: "What you should be careful about",
-    content: "• Review the IP ownership terms carefully — you may not fully own all code.\n• The 60-day notice period for non-renewal could be easy to miss.\n• Consider negotiating the non-compete clause if you might want to hire their developers.\n• Ensure the monthly retainer covers your expected workload.",
-  },
-];
+import { useDocumentStore } from "@/hooks/useDocumentAnalysis";
 
 const Explanation = () => {
+  const navigate = useNavigate();
+  const { sections, fileName, reset } = useDocumentStore();
   const [copied, setCopied] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
+  // Redirect if no sections available
+  useEffect(() => {
+    if (!sections || sections.length === 0) {
+      navigate("/upload");
+    }
+  }, [sections, navigate]);
+
   const handleCopy = () => {
-    const text = explanationSections.map(s => `${s.title}\n${s.content}`).join("\n\n");
+    if (!sections) return;
+    const text = sections.map(s => `${s.title}\n${s.content}`).join("\n\n");
     navigator.clipboard.writeText(text);
     setCopied(true);
     toast({
@@ -53,6 +33,16 @@ const Explanation = () => {
   const handleDownload = () => {
     setShowUpgradeModal(true);
   };
+
+  const handleUploadAnother = () => {
+    reset();
+    navigate("/upload");
+  };
+
+  // Show nothing while redirecting
+  if (!sections || sections.length === 0) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -92,12 +82,13 @@ const Explanation = () => {
             </h1>
             <p className="text-muted-foreground">
               Here's what you need to know about your document
+              {fileName && <span className="block text-sm mt-1">({fileName})</span>}
             </p>
           </div>
 
           {/* Explanation sections */}
           <div className="space-y-6">
-            {explanationSections.map((section, index) => (
+            {sections.map((section, index) => (
               <section 
                 key={index}
                 className="bg-card rounded-xl p-6 border border-border/50"
@@ -117,11 +108,9 @@ const Explanation = () => {
             <p className="text-sm text-muted-foreground mb-4">
               Need to analyze another contract?
             </p>
-            <Link to="/upload">
-              <Button variant="warm">
-                Upload Another Contract
-              </Button>
-            </Link>
+            <Button variant="warm" onClick={handleUploadAnother}>
+              Upload Another Contract
+            </Button>
           </div>
         </div>
       </main>
