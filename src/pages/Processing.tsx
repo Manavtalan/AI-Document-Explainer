@@ -8,9 +8,9 @@ import {
   validateExtractedText, 
   isEnglish as checkIsEnglish, 
   isContractLike as checkIsContractLike,
-  ERROR_MESSAGES,
   TextValidationError 
 } from "@/lib/fileValidation";
+import { safeExtractText } from "@/lib/textExtraction";
 import ValidationError from "@/components/ValidationError";
 import ContractWarningModal from "@/components/ContractWarningModal";
 import DebugPanel from "@/components/DebugPanel";
@@ -52,16 +52,16 @@ const Processing = () => {
       setValidationError(null);
 
       try {
-        // Step 1: Extract text from file
-        let text = "";
+        // Step 1: Extract text from PDF/DOCX file
+        const extraction = await safeExtractText(file);
         
-        try {
-          text = await file.text();
-        } catch (err) {
-          console.error("Failed to read file:", err);
-          setProcessingError(ERROR_MESSAGES.cannot_read.title + " " + ERROR_MESSAGES.cannot_read.description);
+        if (extraction.error) {
+          console.error("Text extraction failed:", extraction.error);
+          setProcessingError(extraction.error.message);
           return;
         }
+        
+        const text = extraction.text;
 
         // Store extracted text for debug panel
         setExtractedText(text);
