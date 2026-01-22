@@ -2,12 +2,14 @@ import { useState, useCallback } from "react";
 import { FileText, Upload as UploadIcon, X, ArrowRight, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, Link } from "react-router-dom";
+import { useDocumentStore } from "@/hooks/useDocumentAnalysis";
 
 const UploadPage = () => {
   const navigate = useNavigate();
-  const [file, setFile] = useState<File | null>(null);
+  const [localFile, setLocalFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showDocTypeModal, setShowDocTypeModal] = useState(false);
+  const { setFile } = useDocumentStore();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -24,14 +26,14 @@ const UploadPage = () => {
     setIsDragging(false);
     const droppedFile = e.dataTransfer.files[0];
     if (droppedFile && (droppedFile.type === "application/pdf" || droppedFile.name.endsWith(".doc") || droppedFile.name.endsWith(".docx"))) {
-      setFile(droppedFile);
+      setLocalFile(droppedFile);
     }
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      setFile(selectedFile);
+      setLocalFile(selectedFile);
     }
   };
 
@@ -40,6 +42,9 @@ const UploadPage = () => {
   };
 
   const handleDocTypeConfirm = () => {
+    if (localFile) {
+      setFile(localFile);
+    }
     setShowDocTypeModal(false);
     navigate("/processing");
   };
@@ -78,25 +83,25 @@ const UploadPage = () => {
               relative border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-200
               ${isDragging 
                 ? "border-primary bg-sage/30" 
-                : file 
+                : localFile 
                   ? "border-primary/50 bg-sage/20" 
                   : "border-border hover:border-primary/30 hover:bg-card"
               }
             `}
           >
-            {file ? (
+            {localFile ? (
               <div className="space-y-4">
                 <div className="w-16 h-16 rounded-2xl bg-sage mx-auto flex items-center justify-center">
                   <FileCheck className="w-8 h-8 text-primary" />
                 </div>
                 <div>
-                  <p className="font-medium text-foreground">{file.name}</p>
+                  <p className="font-medium text-foreground">{localFile.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {(file.size / 1024 / 1024).toFixed(2)} MB
+                    {(localFile.size / 1024 / 1024).toFixed(2)} MB
                   </p>
                 </div>
                 <button
-                  onClick={() => setFile(null)}
+                  onClick={() => setLocalFile(null)}
                   className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <X className="w-4 h-4" />
@@ -128,7 +133,7 @@ const UploadPage = () => {
           </div>
 
           {/* Analyze button */}
-          {file && (
+          {localFile && (
             <div className="mt-8 text-center">
               <Button variant="hero" size="xl" onClick={handleAnalyze}>
                 Analyze Contract
