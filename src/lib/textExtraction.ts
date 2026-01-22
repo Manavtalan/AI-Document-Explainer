@@ -1,7 +1,8 @@
-import * as pdfjsLib from 'pdfjs-dist';
+// Use legacy build to avoid top-level await issues
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Configure PDF.js worker using legacy version
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
 /**
  * Extract text from a PDF file
@@ -25,11 +26,14 @@ export async function extractTextFromPDF(file: File): Promise<string> {
 }
 
 /**
- * Extract text from a DOCX file using mammoth
+ * Extract text from a DOCX file
+ * Uses dynamic import to handle mammoth's browser compatibility
  */
 export async function extractTextFromDOCX(file: File): Promise<string> {
-  const mammoth = await import('mammoth');
   const arrayBuffer = await file.arrayBuffer();
+  
+  // Dynamic import mammoth's browser build
+  const mammoth = await import('mammoth/mammoth.browser.min.js');
   const result = await mammoth.extractRawText({ arrayBuffer });
   return result.value;
 }
@@ -50,7 +54,6 @@ export async function extractText(file: File): Promise<string> {
   
   if (fileName.endsWith('.doc')) {
     // Legacy .doc files are binary and require server-side processing
-    // For now, attempt to read as text (will likely fail validation)
     throw new Error('Legacy .doc files are not fully supported. Please save as .docx');
   }
   
