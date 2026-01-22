@@ -31,7 +31,7 @@ const SYSTEM_PROMPT = `You are a legal document analyst helping non-technical us
 
 ## OUTPUT FORMAT
 
-You MUST return a JSON array with EXACTLY 7 sections in this order. Each section is an object with "title" and "content" keys.
+You MUST return a JSON object with a "sections" key containing an array of EXACTLY 7 sections in this order. Each section is an object with "title" and "content" keys.
 
 ### Section 1: What this contract is
 Briefly describe the type of document and its main purpose. One paragraph maximum.
@@ -63,15 +63,20 @@ Practical points to pay attention to. Use bullet points with • symbol. Focus o
 - Things to verify before signing
 - Potential negotiation points
 
+## FORMAT REQUIREMENTS (CRITICAL)
+- Return ONLY valid JSON with this structure: {"sections": [...]}
+- Every section MUST have exactly two keys: "title" (string) and "content" (string)
+- Never return null, numbers, or nested objects for title/content values
+- If a section has no content, use the string "Not specified in this document."
+- Do NOT wrap the response in markdown code blocks
+
 ## TONE GUIDELINES
 
 - Write as if explaining to a friend over coffee
 - Use short sentences
 - Avoid words like "pursuant to", "hereinafter", "notwithstanding"
 - If a clause is complex, explain it in 2-3 simple sentences
-- Be helpful but not advisory
-
-Return ONLY the JSON array. No markdown code blocks. No explanatory text before or after.`;
+- Be helpful but not advisory`;
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -130,6 +135,7 @@ ${documentText}`;
         ],
         temperature: 0.3,
         max_tokens: 2000,
+        response_format: { type: "json_object" },
       }),
     });
 
@@ -180,6 +186,9 @@ ${documentText}`;
       );
     }
 
+    // Debug logging
+    console.log("Raw AI response content:", content.substring(0, 500));
+
     // Parse the JSON response
     let sections: ExplanationSection[];
     try {
@@ -196,22 +205,39 @@ ${documentText}`;
       }
       cleanedContent = cleanedContent.trim();
 
-      sections = JSON.parse(cleanedContent);
+      const parsed = JSON.parse(cleanedContent);
       
-      // Validate that we have the expected structure
-      if (!Array.isArray(sections) || sections.length === 0) {
-        throw new Error("Invalid response structure");
+      // Handle multiple response formats - AI might return array directly or wrapped in object
+      let rawSections: any[];
+      if (Array.isArray(parsed)) {
+        rawSections = parsed;
+      } else if (parsed.sections && Array.isArray(parsed.sections)) {
+        rawSections = parsed.sections;
+      } else if (typeof parsed === 'object') {
+        // Try to extract any array from the object
+        const arrayValues = Object.values(parsed).find(v => Array.isArray(v));
+        rawSections = arrayValues ? (arrayValues as any[]) : [parsed];
+      } else {
+        throw new Error("Unexpected response format");
       }
       
-      // Ensure each section has title and content
-      for (const section of sections) {
-        if (typeof section.title !== 'string' || typeof section.content !== 'string') {
-          throw new Error("Invalid section structure");
-        }
+      // Coerce and filter sections - be lenient with format
+      sections = rawSections
+        .filter((s: any) => s && typeof s === 'object' && (s.title || s.content))
+        .map((s: any) => ({
+          title: String(s.title || "Untitled Section"),
+          content: String(s.content || "Not specified in this document."),
+        }));
+      
+      if (sections.length === 0) {
+        throw new Error("No valid sections found in response");
       }
+
+      console.log(`Successfully parsed ${sections.length} sections`);
       
     } catch (parseError) {
-      console.error("Failed to parse OpenAI response:", parseError);
+      console.error("Failed to parse AI response:", parseError);
+      console.error("Raw content was:", content.substring(0, 1000));
       return new Response(
         JSON.stringify({
           success: false,
