@@ -55,12 +55,17 @@ const UpgradeModal = ({ isOpen, onClose }: UpgradeModalProps) => {
 
     setIsSubmitting(true);
 
+    const submittedAt = new Date().toISOString();
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedName = name.trim() || null;
+
     try {
+      // Save to Supabase (primary storage)
       const { error } = await supabase
         .from("pro_access_requests")
         .insert({
-          email: email.trim().toLowerCase(),
-          name: name.trim() || null,
+          email: trimmedEmail,
+          name: trimmedName,
           source: "Pro Request – Beta"
         });
 
@@ -71,10 +76,27 @@ const UpgradeModal = ({ isOpen, onClose }: UpgradeModalProps) => {
         return;
       }
 
+      // Sync to Google Sheets (fire and forget - don't block user)
+      try {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        fetch(`${supabaseUrl}/functions/v1/sync-to-sheets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: trimmedEmail,
+            name: trimmedName,
+            source: "Pro Request – Beta",
+            submittedAt
+          })
+        }).catch(err => console.error("Google Sheets sync failed:", err));
+      } catch {
+        // Fail silently - Sheets sync is non-critical
+      }
+
       // Store local flag to avoid repeated prompts
       try {
         localStorage.setItem("pro_requested", "true");
-        localStorage.setItem("pro_requested_date", new Date().toISOString());
+        localStorage.setItem("pro_requested_date", submittedAt);
       } catch {
         // Fail silently if localStorage unavailable
       }
