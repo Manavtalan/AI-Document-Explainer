@@ -32,14 +32,34 @@ async function createGoogleJWT(clientEmail: string, privateKey: string): Promise
   const unsignedToken = `${headerB64}.${payloadB64}`;
 
   // Fix: Handle escaped newlines in private key (common when stored as env var)
-  const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
+  // Also handle case where key might be double-escaped or have different escaping
+  let formattedPrivateKey = privateKey;
   
-  // Parse the private key
-  const pemContents = formattedPrivateKey
-    .replace(/-----BEGIN PRIVATE KEY-----/, "")
-    .replace(/-----END PRIVATE KEY-----/, "")
-    .replace(/\n/g, "")
-    .trim();
+  // Handle various newline escape formats
+  formattedPrivateKey = formattedPrivateKey.replace(/\\\\n/g, '\n'); // double-escaped
+  formattedPrivateKey = formattedPrivateKey.replace(/\\n/g, '\n');   // single-escaped
+  
+  // Parse the private key - handle both with and without headers
+  let pemContents = formattedPrivateKey;
+  
+  // Remove PEM headers/footers if present
+  if (pemContents.includes('-----BEGIN')) {
+    pemContents = pemContents
+      .replace(/-----BEGIN PRIVATE KEY-----/g, "")
+      .replace(/-----END PRIVATE KEY-----/g, "")
+      .replace(/-----BEGIN RSA PRIVATE KEY-----/g, "")
+      .replace(/-----END RSA PRIVATE KEY-----/g, "");
+  }
+  
+  // Clean up whitespace and newlines
+  pemContents = pemContents.replace(/[\n\r\s]/g, "").trim();
+  
+  // Debug: Log key length to verify it's being parsed
+  console.log(`Private key parsed, base64 length: ${pemContents.length}`);
+  
+  if (pemContents.length < 100) {
+    throw new Error(`Private key appears malformed (length: ${pemContents.length}). Please re-enter the full private key from your service account JSON file.`);
+  }
   
   const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
   
