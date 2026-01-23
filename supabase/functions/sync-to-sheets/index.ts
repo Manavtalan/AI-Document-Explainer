@@ -154,6 +154,26 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    
+    // Check if private key looks valid (should be ~1700+ chars when properly stored)
+    // Clean the key first before checking length
+    const cleanedKeyLength = privateKey
+      .replace(/-----BEGIN.*?-----/g, "")
+      .replace(/-----END.*?-----/g, "")
+      .replace(/[\n\r\s\\]/g, "")
+      .length;
+    
+    if (cleanedKeyLength < 1000) {
+      console.error(`Google Sheets private key appears truncated (${cleanedKeyLength} chars). Sync disabled until key is properly configured.`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Google Sheets sync temporarily disabled - private key needs reconfiguration",
+          note: "Pro request was still saved to database"
+        }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Parse request body
     const body: ProAccessRequest = await req.json();
