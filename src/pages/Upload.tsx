@@ -174,7 +174,7 @@ const UploadPage = () => {
             )}
           </div>
 
-          {/* Analyze button */}
+          {/* Upload button - Phase 4: "Upload Contract" CTA */}
           {localFile && (
             <div className="mt-8 text-center">
               <Button 
@@ -183,7 +183,7 @@ const UploadPage = () => {
                 onClick={handleAnalyze}
                 disabled={isProcessing}
               >
-                {isProcessing ? "Processing..." : "Analyze Contract"}
+                {isProcessing ? "Processing..." : "Upload Contract"}
                 {!isProcessing && <ArrowRight className="w-5 h-5 ml-2" />}
               </Button>
             </div>
@@ -191,7 +191,7 @@ const UploadPage = () => {
         </div>
       </main>
 
-      {/* Document Type Modal */}
+      {/* Document Type Modal - Phase 4 */}
       {showDocTypeModal && (
         <div className="fixed inset-0 bg-foreground/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-background rounded-2xl p-8 max-w-md w-full shadow-calm border border-border/50">
@@ -203,25 +203,35 @@ const UploadPage = () => {
             </p>
 
             <div className="space-y-3">
+              {/* Contract - enabled */}
               <button
                 onClick={handleDocTypeConfirm}
                 className="w-full p-4 text-left rounded-xl border border-primary bg-sage/30 hover:bg-sage/50 transition-colors"
               >
-                <span className="font-medium text-foreground">Contract</span>
+                <span className="font-medium text-foreground">✅ Contract</span>
+              </button>
+              
+              {/* Coming soon options - disabled */}
+              <button
+                disabled
+                className="w-full p-4 text-left rounded-xl border border-border bg-muted/50 opacity-60 cursor-not-allowed"
+              >
+                <span className="font-medium text-muted-foreground">🔒 Offer Letter</span>
+                <span className="text-xs text-muted-foreground ml-2">(Coming soon)</span>
               </button>
               <button
                 disabled
                 className="w-full p-4 text-left rounded-xl border border-border bg-muted/50 opacity-60 cursor-not-allowed"
               >
-                <span className="font-medium text-muted-foreground">Offer Letter</span>
-                <span className="text-xs text-muted-foreground ml-2">(coming soon)</span>
+                <span className="font-medium text-muted-foreground">🔒 Bank Letter</span>
+                <span className="text-xs text-muted-foreground ml-2">(Coming soon)</span>
               </button>
               <button
                 disabled
                 className="w-full p-4 text-left rounded-xl border border-border bg-muted/50 opacity-60 cursor-not-allowed"
               >
-                <span className="font-medium text-muted-foreground">Bank Letter</span>
-                <span className="text-xs text-muted-foreground ml-2">(coming soon)</span>
+                <span className="font-medium text-muted-foreground">🔒 Legal Notice</span>
+                <span className="text-xs text-muted-foreground ml-2">(Coming soon)</span>
               </button>
             </div>
 
