@@ -260,7 +260,7 @@ serve(async (req) => {
         }
       }
 
-      // Validate: Check for legal advice language (safety check)
+      // Task 8: Validate - Check for legal advice language (safety check)
       const allContent = Object.values(explanation).join(" ").toLowerCase();
       const advicePatterns = [
         "you should",
@@ -281,11 +281,25 @@ serve(async (req) => {
         }
       }
 
-      // Validate: Check tone is neutral (no scary words in risks)
-      const scaryWords = ["unfair", "illegal", "bad deal", "terrible", "dangerous", "scam"];
-      for (const word of scaryWords) {
-        if (explanation.risks.toLowerCase().includes(word)) {
-          console.warn(`Scary word detected in risks: "${word}"`);
+      // Task 8: Risk Language Stress Testing - Check for forbidden words
+      const forbiddenRiskWords = [
+        "unfair", 
+        "illegal", 
+        "bad deal", 
+        "terrible", 
+        "dangerous", 
+        "scam",
+        "you should negotiate",
+        "you should avoid signing",
+        "avoid this",
+        "do not sign",
+        "don't sign"
+      ];
+      
+      for (const word of forbiddenRiskWords) {
+        if (allContent.includes(word)) {
+          console.warn(`Forbidden risk word detected: "${word}"`);
+          // Log for monitoring - prompt should prevent this
         }
       }
 
