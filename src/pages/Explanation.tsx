@@ -1,26 +1,41 @@
 import { useState, useEffect } from "react";
-import { FileText, Copy, Download, Check, Lock, AlertCircle } from "lucide-react";
+import { FileText, Copy, Download, Check, Lock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { useDocumentStore } from "@/hooks/useDocumentAnalysis";
+import { useDocumentStore, SECTION_LABELS, SECTION_ORDER, ContractExplanation } from "@/hooks/useDocumentAnalysis";
 
+/**
+ * Explanation Page - Phase 3 Compliant
+ * 
+ * This component ONLY renders text from the backend.
+ * - No interpretation
+ * - No conditional logic based on content
+ * - No rewriting or summarizing
+ * 
+ * Backend owns all intelligence.
+ */
 const Explanation = () => {
   const navigate = useNavigate();
-  const { sections, fileName, reset } = useDocumentStore();
+  const { explanation, fileName, reset } = useDocumentStore();
   const [copied, setCopied] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-  // Redirect if no sections available
+  // Redirect if no explanation available
   useEffect(() => {
-    if (!sections || sections.length === 0) {
+    if (!explanation) {
       navigate("/upload");
     }
-  }, [sections, navigate]);
+  }, [explanation, navigate]);
 
   const handleCopy = () => {
-    if (!sections) return;
-    const text = sections.map(s => `${s.title}\n${s.content}`).join("\n\n");
+    if (!explanation) return;
+    
+    // Build plain text version for clipboard
+    const text = SECTION_ORDER
+      .map(key => `${SECTION_LABELS[key]}\n${explanation[key]}`)
+      .join("\n\n");
+    
     navigator.clipboard.writeText(text);
     setCopied(true);
     toast({
@@ -40,9 +55,13 @@ const Explanation = () => {
   };
 
   // Show nothing while redirecting
-  if (!sections || sections.length === 0) {
+  if (!explanation) {
     return null;
   }
+
+  // Check if this is a "risks" section for special styling
+  const isRiskSection = (key: keyof ContractExplanation) => key === "risks";
+  const isCautionSection = (key: keyof ContractExplanation) => key === "be_careful";
 
   return (
     <div className="min-h-screen bg-background">
@@ -86,21 +105,42 @@ const Explanation = () => {
             </p>
           </div>
 
-          {/* Explanation sections */}
+          {/* Explanation sections - rendered in fixed order */}
           <div className="space-y-6">
-            {sections.map((section, index) => (
+            {SECTION_ORDER.map((key) => (
               <section 
-                key={index}
-                className="bg-card rounded-xl p-6 border border-border/50"
+                key={key}
+                className={`
+                  bg-card rounded-xl p-6 border
+                  ${isRiskSection(key) || isCautionSection(key) 
+                    ? "border-amber-200 bg-amber-50/50" 
+                    : "border-border/50"
+                  }
+                `}
               >
-                <h2 className="text-lg font-serif font-semibold mb-3 text-foreground">
-                  {section.title}
+                <h2 className="text-lg font-serif font-semibold mb-3 text-foreground flex items-center gap-2">
+                  {(isRiskSection(key) || isCautionSection(key)) && (
+                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  )}
+                  {SECTION_LABELS[key]}
                 </h2>
-                <p className="text-muted-foreground leading-relaxed whitespace-pre-line">
-                  {section.content}
-                </p>
+                {/* 
+                  CRITICAL: Only render text, no interpretation
+                  whitespace-pre-line preserves line breaks from backend
+                */}
+                <div className="text-muted-foreground leading-relaxed whitespace-pre-line">
+                  {explanation[key]}
+                </div>
               </section>
             ))}
+          </div>
+
+          {/* Disclaimer */}
+          <div className="mt-10 p-4 bg-muted/50 rounded-xl border border-border/30">
+            <p className="text-xs text-muted-foreground text-center">
+              This explanation is for informational purposes only and does not constitute legal advice. 
+              If you have questions about this contract, please consult a qualified attorney.
+            </p>
           </div>
 
           {/* Bottom CTA */}

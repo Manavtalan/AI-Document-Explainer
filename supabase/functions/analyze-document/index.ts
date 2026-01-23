@@ -6,69 +6,94 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface ExplanationSection {
-  title: string;
-  content: string;
+// Fixed JSON response structure - Phase 3 requirement
+interface ContractExplanation {
+  what_is_this: string;
+  who_is_involved: string;
+  agreements: string;
+  payments: string;
+  duration: string;
+  risks: string;
+  be_careful: string;
 }
 
 interface AnalysisResponse {
   success: boolean;
-  sections?: ExplanationSection[];
+  explanation?: ContractExplanation;
   error?: string;
 }
 
-// LOCKED SYSTEM PROMPT - DO NOT MODIFY WITHOUT TESTING
-// Version 1.0.0
+// Default value for missing/unclear content
+const DEFAULT_VALUE = "Not clearly specified in this contract.";
+
+// LOCKED SYSTEM PROMPT - V1.0.0
+// DO NOT MODIFY WITHOUT TESTING
 const SYSTEM_PROMPT = `You are a legal document analyst helping non-technical users understand contracts. Your job is to explain contracts in simple, plain English that anyone can understand.
 
-## CRITICAL RULES
+## CRITICAL RULES (MUST FOLLOW)
 
-1. **Never provide legal advice** - You explain what the document says, not what the user should do.
-2. **Never invent information** - If something is not in the document, say "Not clearly specified in this document."
-3. **Never use scary language** - Remain calm, neutral, and informative. No alarmist tone.
-4. **Never use legal jargon** - Replace complex terms with simple explanations.
-5. **Admit uncertainty** - If something is unclear, say so. Don't guess.
+1. **Explain ONLY what is written** - Describe what the document says, never what it should say.
+2. **NEVER provide legal advice** - No recommendations, no suggestions, no "you should".
+3. **NEVER invent information** - If something is not in the document, say "Not clearly specified in this contract."
+4. **NEVER use scary language** - Remain calm, neutral, and informative. No alarmist tone.
+5. **NEVER use legal jargon** - Replace complex terms with simple explanations.
+6. **Admit uncertainty** - If something is unclear, use words like "may", "could", "appears to be".
 
-## OUTPUT FORMAT
+## OUTPUT FORMAT (STRICT - DO NOT DEVIATE)
 
-You MUST return a JSON object with a "sections" key containing an array of EXACTLY 7 sections in this order. Each section is an object with "title" and "content" keys.
+Return a JSON object with EXACTLY these 7 keys. Every key MUST exist. Every value MUST be a non-empty string.
 
-### Section 1: What this contract is
-Briefly describe the type of document and its main purpose. One paragraph maximum.
+{
+  "what_is_this": "Type of contract and its main purpose. One paragraph maximum.",
+  "who_is_involved": "List all parties and explain their roles simply.",
+  "agreements": "Main obligations and commitments. What does each party promise to do?",
+  "payments": "Financial terms: amounts, schedules, penalties. If none, say so clearly.",
+  "duration": "How long it lasts, how it can be ended, notice periods.",
+  "risks": "Concerning clauses using cautious language (may, could, appears). No scary words.",
+  "be_careful": "Practical points to pay attention to. Focus on awareness, not advice."
+}
 
-### Section 2: Who is involved  
-List all parties mentioned in the document. Explain their roles simply.
+## FIELD REQUIREMENTS
 
-### Section 3: What you are agreeing to
-Summarize the main obligations and commitments. What does each party promise to do?
+### what_is_this
+- Type of contract (e.g., freelance agreement, employment contract, NDA)
+- Purpose explained simply
+- One short paragraph
 
-### Section 4: Money & payments
-Detail any financial terms: amounts, payment schedules, penalties, currencies. If none, say "No payment terms specified in this document."
+### who_is_involved  
+- Clearly identify Party A and Party B
+- Explain their roles in simple terms
+- Avoid legal entity jargon
 
-### Section 5: Duration & termination
-How long does this last? How can it be ended? Notice periods? Renewal terms?
+### agreements
+- Explain what each party is agreeing to do
+- Include responsibilities, deliverables, obligations
+- Break complex clauses into simple points
+- Do NOT advise or judge
 
-### Section 6: Risks & red flags
-Use ⚠️ emoji to highlight concerning clauses. Focus on:
-- Unusual limitations
-- Hidden obligations  
-- One-sided terms
-- Potential penalties
-If nothing concerning, say "No significant red flags identified."
+### payments
+- Fees or salary amounts
+- Payment schedule
+- Late fees or penalties (if any)
+- If no payment info exists, say "No payment terms are specified in this contract."
 
-### Section 7: What you should be careful about
-Practical points to pay attention to. Use bullet points with • symbol. Focus on:
-- Deadlines the user shouldn't miss
-- Clauses that might have unexpected consequences
-- Things to verify before signing
-- Potential negotiation points
+### duration
+- Start date (if mentioned)
+- End date or ongoing nature
+- How termination works (notice period, conditions)
+- Explain in plain English
 
-## FORMAT REQUIREMENTS (CRITICAL)
-- Return ONLY valid JSON with this structure: {"sections": [...]}
-- Every section MUST have exactly two keys: "title" (string) and "content" (string)
-- Never return null, numbers, or nested objects for title/content values
-- If a section has no content, use the string "Not specified in this document."
-- Do NOT wrap the response in markdown code blocks
+### risks
+- Highlight clauses that are vague, one-sided, or could create obligations
+- Use cautious language: "may", "could", "is unclear", "appears to"
+- Do NOT say "unfair", "illegal", "bad", or other judgmental words
+- If nothing concerning, say "No significant concerns identified in this contract."
+
+### be_careful
+- Plain-English awareness points
+- Things the reader should pay attention to
+- No action recommendations or advice
+- Focus on awareness, not what to do
 
 ## TONE GUIDELINES
 
@@ -76,7 +101,16 @@ Practical points to pay attention to. Use bullet points with • symbol. Focus o
 - Use short sentences
 - Avoid words like "pursuant to", "hereinafter", "notwithstanding"
 - If a clause is complex, explain it in 2-3 simple sentences
-- Be helpful but not advisory`;
+- Be helpful but not advisory
+- Stay calm and neutral
+
+## CRITICAL FORMAT RULES
+
+- Return ONLY valid JSON with the exact 7 keys above
+- Every value MUST be a non-empty string
+- Never return null, undefined, empty strings, or missing keys
+- Do NOT wrap the response in markdown code blocks
+- Do NOT include any text before or after the JSON`;
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -93,7 +127,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: "We're unable to process your document right now. Please try again later.",
+          error: "We couldn't confidently analyze this contract right now. Please try again in a moment.",
         } as AnalysisResponse),
         {
           status: 200,
@@ -102,7 +136,7 @@ serve(async (req) => {
       );
     }
 
-    const { documentText, fileName } = await req.json();
+    const { documentText } = await req.json();
 
     if (!documentText || documentText.trim().length === 0) {
       return new Response(
@@ -117,9 +151,10 @@ serve(async (req) => {
       );
     }
 
-    const userPrompt = `Please analyze this document${fileName ? ` (${fileName})` : ""} and explain it in plain English:
+    // User prompt - ONLY the contract text, no extra instructions
+    const userPrompt = documentText;
 
-${documentText}`;
+    console.log(`Processing document with ${documentText.length} characters`);
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -134,33 +169,20 @@ ${documentText}`;
           { role: "user", content: userPrompt },
         ],
         temperature: 0.3,
-        max_tokens: 2000,
+        max_tokens: 3000,
         response_format: { type: "json_object" },
       }),
     });
 
-    // Handle API errors gracefully
+    // Handle API errors gracefully - never expose provider names
     if (!response.ok) {
       const status = response.status;
-      console.error("OpenAI API error:", status);
-
-      let errorMessage = "We're unable to process your document right now. Please try again later.";
-      
-      if (status === 401) {
-        console.error("Invalid API key");
-        errorMessage = "We're experiencing a service configuration issue. Please try again later.";
-      } else if (status === 429) {
-        console.error("Rate limited");
-        errorMessage = "Our service is experiencing high demand. Please wait a moment and try again.";
-      } else if (status === 500 || status === 503) {
-        console.error("OpenAI service error");
-        errorMessage = "The analysis service is temporarily unavailable. Please try again in a few minutes.";
-      }
+      console.error("AI provider error:", status);
 
       return new Response(
         JSON.stringify({
           success: false,
-          error: errorMessage,
+          error: "We couldn't confidently analyze this contract right now. Please try again in a moment.",
         } as AnalysisResponse),
         {
           status: 200,
@@ -172,12 +194,13 @@ ${documentText}`;
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
 
+    // Empty response = failure
     if (!content) {
-      console.error("No content in OpenAI response");
+      console.error("Empty response from AI");
       return new Response(
         JSON.stringify({
           success: false,
-          error: "We couldn't analyze your document. Please try uploading it again.",
+          error: "We couldn't confidently analyze this contract right now. Please try again in a moment.",
         } as AnalysisResponse),
         {
           status: 200,
@@ -187,12 +210,12 @@ ${documentText}`;
     }
 
     // Debug logging
-    console.log("Raw AI response content:", content.substring(0, 500));
+    console.log("Raw AI response (first 500 chars):", content.substring(0, 500));
 
-    // Parse the JSON response
-    let sections: ExplanationSection[];
+    // Parse and validate the JSON response
+    let explanation: ContractExplanation;
     try {
-      // Clean up the response in case it has markdown code blocks
+      // Clean up any markdown artifacts
       let cleanedContent = content.trim();
       if (cleanedContent.startsWith("```json")) {
         cleanedContent = cleanedContent.slice(7);
@@ -206,34 +229,67 @@ ${documentText}`;
       cleanedContent = cleanedContent.trim();
 
       const parsed = JSON.parse(cleanedContent);
-      
-      // Handle multiple response formats - AI might return array directly or wrapped in object
-      let rawSections: any[];
-      if (Array.isArray(parsed)) {
-        rawSections = parsed;
-      } else if (parsed.sections && Array.isArray(parsed.sections)) {
-        rawSections = parsed.sections;
-      } else if (typeof parsed === 'object') {
-        // Try to extract any array from the object
-        const arrayValues = Object.values(parsed).find(v => Array.isArray(v));
-        rawSections = arrayValues ? (arrayValues as any[]) : [parsed];
-      } else {
-        throw new Error("Unexpected response format");
-      }
-      
-      // Coerce and filter sections - be lenient with format
-      sections = rawSections
-        .filter((s: any) => s && typeof s === 'object' && (s.title || s.content))
-        .map((s: any) => ({
-          title: String(s.title || "Untitled Section"),
-          content: String(s.content || "Not specified in this document."),
-        }));
-      
-      if (sections.length === 0) {
-        throw new Error("No valid sections found in response");
+
+      // Required keys for Phase 3
+      const requiredKeys: (keyof ContractExplanation)[] = [
+        "what_is_this",
+        "who_is_involved", 
+        "agreements",
+        "payments",
+        "duration",
+        "risks",
+        "be_careful"
+      ];
+
+      // Build the explanation object with validation
+      explanation = {
+        what_is_this: DEFAULT_VALUE,
+        who_is_involved: DEFAULT_VALUE,
+        agreements: DEFAULT_VALUE,
+        payments: DEFAULT_VALUE,
+        duration: DEFAULT_VALUE,
+        risks: DEFAULT_VALUE,
+        be_careful: DEFAULT_VALUE,
+      };
+
+      // Populate from parsed response, coercing to strings
+      for (const key of requiredKeys) {
+        const value = parsed[key];
+        if (value !== undefined && value !== null && value !== "") {
+          explanation[key] = String(value).trim() || DEFAULT_VALUE;
+        }
       }
 
-      console.log(`Successfully parsed ${sections.length} sections`);
+      // Validate: Check for legal advice language (safety check)
+      const allContent = Object.values(explanation).join(" ").toLowerCase();
+      const advicePatterns = [
+        "you should",
+        "i recommend",
+        "i suggest",
+        "you must",
+        "you need to",
+        "i advise",
+        "seek legal counsel",
+        "consult a lawyer",
+        "get legal advice"
+      ];
+      
+      for (const pattern of advicePatterns) {
+        if (allContent.includes(pattern)) {
+          console.warn(`Legal advice pattern detected: "${pattern}"`);
+          // Don't fail, just log - the prompt should prevent this
+        }
+      }
+
+      // Validate: Check tone is neutral (no scary words in risks)
+      const scaryWords = ["unfair", "illegal", "bad deal", "terrible", "dangerous", "scam"];
+      for (const word of scaryWords) {
+        if (explanation.risks.toLowerCase().includes(word)) {
+          console.warn(`Scary word detected in risks: "${word}"`);
+        }
+      }
+
+      console.log("Successfully parsed explanation with all 7 fields");
       
     } catch (parseError) {
       console.error("Failed to parse AI response:", parseError);
@@ -241,7 +297,7 @@ ${documentText}`;
       return new Response(
         JSON.stringify({
           success: false,
-          error: "We had trouble interpreting the analysis. Please try again.",
+          error: "We couldn't confidently analyze this contract right now. Please try again in a moment.",
         } as AnalysisResponse),
         {
           status: 200,
@@ -253,7 +309,7 @@ ${documentText}`;
     return new Response(
       JSON.stringify({
         success: true,
-        sections,
+        explanation,
       } as AnalysisResponse),
       {
         status: 200,
@@ -265,7 +321,7 @@ ${documentText}`;
     return new Response(
       JSON.stringify({
         success: false,
-        error: "Something went wrong. Please try again later.",
+        error: "We couldn't confidently analyze this contract right now. Please try again in a moment.",
       } as AnalysisResponse),
       {
         status: 200,
