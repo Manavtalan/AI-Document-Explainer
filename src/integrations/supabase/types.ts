@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      document_feedback: {
+        Row: {
+          created_at: string
+          helpfulness: string
+          id: string
+          session_id: string | null
+          text_feedback: string | null
+          version: string
+        }
+        Insert: {
+          created_at?: string
+          helpfulness: string
+          id?: string
+          session_id?: string | null
+          text_feedback?: string | null
+          version?: string
+        }
+        Update: {
+          created_at?: string
+          helpfulness?: string
+          id?: string
+          session_id?: string | null
+          text_feedback?: string | null
+          version?: string
+        }
+        Relationships: []
+      }
       pro_access_requests: {
         Row: {
           created_at: string

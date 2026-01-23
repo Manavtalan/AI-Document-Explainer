@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { useDocumentStore, SECTION_LABELS, SECTION_ORDER, ContractExplanation } from "@/hooks/useDocumentAnalysis";
 import { analyzeComplexity, ComplexityLevel } from "@/lib/complexityAnalyzer";
-
+import FeedbackSection from "@/components/FeedbackSection";
 /**
  * Phase 4: Content Renderer
  * Renders text with proper formatting:
@@ -68,6 +68,15 @@ const Explanation = () => {
   const navigate = useNavigate();
   const { explanation, fileName, extractedText, reset } = useDocumentStore();
   const [copied, setCopied] = useState(false);
+  
+  // Generate a session ID for feedback tracking
+  const sessionId = useMemo(() => {
+    const existing = sessionStorage.getItem("doc_session_id");
+    if (existing) return existing;
+    const newId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    sessionStorage.setItem("doc_session_id", newId);
+    return newId;
+  }, []);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // Task 4.2: Calculate complexity from extracted text
@@ -227,6 +236,9 @@ const Explanation = () => {
               If you have questions about this contract, please consult a qualified attorney.
             </p>
           </div>
+
+          {/* Feedback Section - after all explanation content */}
+          <FeedbackSection sessionId={sessionId} />
 
           {/* Bottom CTA */}
           <div className="mt-12 text-center">
