@@ -6,7 +6,55 @@ import { toast } from "@/hooks/use-toast";
 import { useDocumentStore, SECTION_LABELS, SECTION_ORDER, ContractExplanation } from "@/hooks/useDocumentAnalysis";
 
 /**
- * Explanation Page - Phase 3 Compliant
+ * Phase 4: Content Renderer
+ * Renders text with proper formatting:
+ * - Bullet points where lines start with • or -
+ * - Paragraphs otherwise
+ * - Preserves line breaks
+ */
+const ContentRenderer = ({ content }: { content: string }) => {
+  // Check if content has bullet points
+  const lines = content.split('\n').filter(line => line.trim());
+  const hasBullets = lines.some(line => 
+    line.trim().startsWith('•') || 
+    line.trim().startsWith('-') ||
+    line.trim().startsWith('⚠️')
+  );
+
+  if (hasBullets) {
+    return (
+      <ul className="space-y-2">
+        {lines.map((line, i) => {
+          const trimmed = line.trim();
+          // Remove bullet character if present
+          const text = trimmed.replace(/^[•\-]\s*/, '').replace(/^⚠️\s*/, '');
+          const hasWarning = trimmed.startsWith('⚠️');
+          
+          return (
+            <li key={i} className="flex gap-2 text-muted-foreground leading-relaxed">
+              <span className="flex-shrink-0 mt-1">
+                {hasWarning ? '⚠️' : '•'}
+              </span>
+              <span>{text || trimmed}</span>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  // Render as paragraphs
+  return (
+    <div className="space-y-3 text-muted-foreground leading-relaxed">
+      {lines.map((line, i) => (
+        <p key={i}>{line}</p>
+      ))}
+    </div>
+  );
+};
+
+/**
+ * Explanation Page - Phase 4 Compliant
  * 
  * This component ONLY renders text from the backend.
  * - No interpretation
@@ -31,16 +79,20 @@ const Explanation = () => {
   const handleCopy = () => {
     if (!explanation) return;
     
-    // Build plain text version for clipboard
+    // Phase 4: Build plain text version for clipboard
+    // Includes section headers + content, maintains readable formatting
     const text = SECTION_ORDER
-      .map(key => `${SECTION_LABELS[key]}\n${explanation[key]}`)
+      .map(key => {
+        const label = SECTION_LABELS[key];
+        const content = explanation[key];
+        return `${label}\n${'─'.repeat(label.length)}\n${content}`;
+      })
       .join("\n\n");
     
     navigator.clipboard.writeText(text);
     setCopied(true);
     toast({
-      title: "Copied to clipboard",
-      description: "The explanation has been copied to your clipboard.",
+      title: "Explanation copied to clipboard",
     });
     setTimeout(() => setCopied(false), 2000);
   };
@@ -59,9 +111,9 @@ const Explanation = () => {
     return null;
   }
 
-  // Check if this is a "risks" section for special styling
-  const isRiskSection = (key: keyof ContractExplanation) => key === "risks";
-  const isCautionSection = (key: keyof ContractExplanation) => key === "be_careful";
+  // Check if this is a risks or caution section for special styling
+  const isWarningSection = (key: keyof ContractExplanation) => 
+    key === "risks" || key === "be_careful";
 
   return (
     <div className="min-h-screen bg-background">
@@ -82,7 +134,7 @@ const Explanation = () => {
             <Button variant="warm" size="sm" onClick={handleCopy}>
               {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
               <span className="hidden sm:inline ml-2">
-                {copied ? "Copied" : "Copy"}
+                {copied ? "Copied!" : "Copy Explanation"}
               </span>
             </Button>
             <Button variant="soft" size="sm" onClick={handleDownload}>
@@ -101,43 +153,46 @@ const Explanation = () => {
             </h1>
             <p className="text-muted-foreground">
               Here's what you need to know about your document
-              {fileName && <span className="block text-sm mt-1">({fileName})</span>}
+              {fileName && (
+                <span className="block text-sm mt-1 truncate max-w-md">
+                  ({fileName})
+                </span>
+              )}
             </p>
           </div>
 
-          {/* Explanation sections - rendered in fixed order */}
+          {/* Explanation sections - Phase 4: rendered in fixed order */}
           <div className="space-y-6">
             {SECTION_ORDER.map((key) => (
               <section 
                 key={key}
                 className={`
-                  bg-card rounded-xl p-6 border
-                  ${isRiskSection(key) || isCautionSection(key) 
-                    ? "border-amber-200 bg-amber-50/50" 
-                    : "border-border/50"
+                  rounded-xl p-6 border
+                  ${isWarningSection(key) 
+                    ? "bg-amber-50/50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800" 
+                    : "bg-card border-border/50"
                   }
                 `}
               >
-                <h2 className="text-lg font-serif font-semibold mb-3 text-foreground flex items-center gap-2">
-                  {(isRiskSection(key) || isCautionSection(key)) && (
-                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                <h2 className="text-lg font-serif font-semibold mb-4 text-foreground flex items-center gap-2">
+                  {isWarningSection(key) && (
+                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                   )}
                   {SECTION_LABELS[key]}
                 </h2>
                 {/* 
-                  CRITICAL: Only render text, no interpretation
-                  whitespace-pre-line preserves line breaks from backend
+                  Phase 4: Render content with proper formatting
+                  - Bullet points where line breaks exist with markers
+                  - Paragraphs otherwise
                 */}
-                <div className="text-muted-foreground leading-relaxed whitespace-pre-line">
-                  {explanation[key]}
-                </div>
+                <ContentRenderer content={explanation[key]} />
               </section>
             ))}
           </div>
 
           {/* Disclaimer */}
           <div className="mt-10 p-4 bg-muted/50 rounded-xl border border-border/30">
-            <p className="text-xs text-muted-foreground text-center">
+            <p className="text-xs text-muted-foreground text-center leading-relaxed">
               This explanation is for informational purposes only and does not constitute legal advice. 
               If you have questions about this contract, please consult a qualified attorney.
             </p>

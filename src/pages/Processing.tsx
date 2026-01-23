@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { FileText, Loader2, AlertCircle } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,21 @@ import ValidationError from "@/components/ValidationError";
 import ContractWarningModal from "@/components/ContractWarningModal";
 import DebugPanel from "@/components/DebugPanel";
 
+// Phase 4: Rotating loading messages
+const LOADING_MESSAGES = [
+  "Analyzing your contract…",
+  "Identifying key clauses…",
+  "Simplifying legal language…",
+  "Reviewing payment terms…",
+  "Checking for important dates…",
+  "Almost there…",
+];
+
+// Phase 4: Timing constants
+const MIN_LOADING_TIME_MS = 3000; // Minimum 3 seconds visible
+const MAX_LOADING_TIME_MS = 90000; // Maximum 90 seconds before timeout
+const MESSAGE_ROTATION_INTERVAL_MS = 3000; // Rotate message every 3 seconds
+
 const Processing = () => {
   const navigate = useNavigate();
   const { file, fileName, setExplanation, setError, setIsAnalyzing, reset } = useDocumentStore();
@@ -24,6 +39,9 @@ const Processing = () => {
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<TextValidationError>(null);
   const [showContractWarning, setShowContractWarning] = useState(false);
+  
+  // Phase 4: Loading message rotation
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   
   // Debug panel data
   const [extractedText, setExtractedText] = useState("");
@@ -37,6 +55,56 @@ const Processing = () => {
   // Prevent double-processing
   const hasStartedRef = useRef(false);
   const pendingTextRef = useRef<string>("");
+  const startTimeRef = useRef<number>(0);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Phase 4: Rotate loading messages
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLoadingMessageIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
+    }, MESSAGE_ROTATION_INTERVAL_MS);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Phase 4: Prevent browser back button during processing
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      // If we're processing, prevent navigation
+      if (!processingError && !validationError) {
+        window.history.pushState(null, '', window.location.pathname);
+      }
+    };
+
+    // Push initial state
+    window.history.pushState(null, '', window.location.pathname);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [processingError, validationError]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Navigate with minimum loading time enforcement
+  const navigateWithMinTime = useCallback(async () => {
+    const elapsed = Date.now() - startTimeRef.current;
+    const remaining = MIN_LOADING_TIME_MS - elapsed;
+    
+    if (remaining > 0) {
+      await new Promise(resolve => setTimeout(resolve, remaining));
+    }
+    
+    navigate("/explanation");
+  }, [navigate]);
 
   useEffect(() => {
     // If no file, redirect to upload
@@ -48,6 +116,13 @@ const Processing = () => {
     // Prevent double-processing in React StrictMode
     if (hasStartedRef.current) return;
     hasStartedRef.current = true;
+    startTimeRef.current = Date.now();
+
+    // Phase 4: Set maximum timeout
+    timeoutRef.current = setTimeout(() => {
+      setProcessingError("We couldn't confidently analyze this contract right now. Please try again.");
+      setError("Timeout");
+    }, MAX_LOADING_TIME_MS);
 
     const extractAndValidate = async () => {
       setIsAnalyzing(true);
@@ -60,6 +135,7 @@ const Processing = () => {
         
         if (extraction.error) {
           console.error("Text extraction failed:", extraction.error);
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
           setProcessingError(extraction.error.message);
           return;
         }
@@ -83,6 +159,7 @@ const Processing = () => {
         
         // Check for hard errors first
         if (validation.error) {
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
           setValidationError(validation.error);
           return;
         }
@@ -99,12 +176,13 @@ const Processing = () => {
         
       } catch (err) {
         console.error("Processing error:", err);
-        setProcessingError("Something went wrong. Please try again later.");
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        setProcessingError("We couldn't confidently analyze this contract right now. Please try again.");
       }
     };
 
     extractAndValidate();
-  }, [file, fileName, navigate, setIsAnalyzing]);
+  }, [file, fileName, navigate, setIsAnalyzing, setError]);
 
   const sendToAI = async (text: string) => {
     try {
@@ -113,43 +191,50 @@ const Processing = () => {
         body: { documentText: text },
       });
 
+      // Clear timeout on response
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
       if (error) {
         console.error("Edge function error:", error);
-        setProcessingError("We couldn't confidently analyze this contract right now. Please try again in a moment.");
+        setProcessingError("We couldn't confidently analyze this contract right now. Please try again.");
         setError("Analysis failed");
         return;
       }
 
       if (!data.success) {
         // Use the exact error from backend (Phase 3 compliant messages)
-        setProcessingError(data.error || "We couldn't confidently analyze this contract right now. Please try again in a moment.");
+        setProcessingError(data.error || "We couldn't confidently analyze this contract right now. Please try again.");
         setError(data.error);
         return;
       }
 
-      // Success - store explanation (Phase 3 fixed structure) and navigate
+      // Success - store explanation and navigate with minimum time
       setExplanation(data.explanation);
-      navigate("/explanation");
+      await navigateWithMinTime();
     } catch (err) {
       console.error("AI analysis error:", err);
-      setProcessingError("We couldn't confidently analyze this contract right now. Please try again in a moment.");
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      setProcessingError("We couldn't confidently analyze this contract right now. Please try again.");
       setError("Analysis failed");
     }
   };
 
   const handleContinueAnyway = async () => {
     setShowContractWarning(false);
+    startTimeRef.current = Date.now(); // Reset start time for min loading
     if (pendingTextRef.current) {
       await sendToAI(pendingTextRef.current);
     }
   };
 
   const handleUploadAnother = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     reset();
     navigate("/upload");
   };
 
   const handleTryAgain = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     reset();
     navigate("/upload");
   };
@@ -205,20 +290,24 @@ const Processing = () => {
             </Button>
           </div>
         ) : (
-          // Loading state
+          // Loading state - Phase 4: Full screen, rotating messages
           <div className="text-center">
             <div className="w-20 h-20 rounded-2xl bg-sage mx-auto flex items-center justify-center mb-8">
               <Loader2 className="w-10 h-10 text-primary animate-spin" />
             </div>
             
-            <h1 className="text-2xl font-serif font-semibold mb-3">
-              Analyzing your contract…
+            {/* Rotating loading message with fade transition */}
+            <h1 
+              key={loadingMessageIndex}
+              className="text-2xl font-serif font-semibold mb-3 animate-fade-in"
+            >
+              {LOADING_MESSAGES[loadingMessageIndex]}
             </h1>
             <p className="text-muted-foreground">
-              This may take up to 1 minute
+              This may take up to a minute
             </p>
             {fileName && (
-              <p className="text-sm text-muted-foreground mt-4">
+              <p className="text-sm text-muted-foreground mt-4 truncate max-w-xs mx-auto">
                 {fileName}
               </p>
             )}
