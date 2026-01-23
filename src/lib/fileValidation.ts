@@ -34,6 +34,10 @@ export const CONTRACT_KEYWORDS = [
 
 export const MIN_CONTRACT_KEYWORDS = 2;
 
+// Thresholds for readability check
+export const MIN_READABLE_RATIO = 0.85; // 85% of chars should be printable ASCII or common unicode
+export const MAX_BINARY_RATIO = 0.05; // Max 5% binary/control characters
+
 export type FileValidationError = 
   | 'unsupported_type'
   | 'file_too_large'
@@ -43,6 +47,7 @@ export type FileValidationError =
 export type TextValidationError =
   | 'insufficient_text'
   | 'non_english'
+  | 'unreadable_text'
   | null;
 
 export type TextValidationWarning =
@@ -69,6 +74,10 @@ export const ERROR_MESSAGES = {
   non_english: {
     title: 'Currently, we support English contracts only.',
     description: 'Please upload an English-language document.',
+  },
+  unreadable_text: {
+    title: 'We could not extract readable text from this document.',
+    description: 'Please upload a clearer file.',
   },
   not_contract_like: {
     title: 'This document may not be a contract.',
@@ -105,6 +114,44 @@ export function validateFile(file: File): FileValidationError {
  */
 export function validateTextLength(text: string): boolean {
   return text.trim().length >= MIN_TEXT_LENGTH;
+}
+
+/**
+ * Check if extracted text is readable (not binary, garbage, or control characters)
+ * Returns true if text appears to be human-readable
+ */
+export function isReadableText(text: string): boolean {
+  if (!text || text.length === 0) return false;
+  
+  let printableCount = 0;
+  let binaryCount = 0;
+  
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    
+    // Printable ASCII (space to tilde) + common unicode ranges
+    // Also allow newlines, tabs, and common punctuation
+    if (
+      (code >= 32 && code <= 126) ||  // Basic ASCII printable
+      (code >= 160 && code <= 255) || // Latin-1 Supplement
+      (code >= 8192 && code <= 8303) || // General Punctuation
+      code === 9 ||   // Tab
+      code === 10 ||  // Newline
+      code === 13 ||  // Carriage return
+      (code >= 8208 && code <= 8231) // Dashes and spaces
+    ) {
+      printableCount++;
+    } else if (code < 32 && code !== 9 && code !== 10 && code !== 13) {
+      // Control characters (excluding tab, newline, CR)
+      binaryCount++;
+    }
+  }
+  
+  const printableRatio = printableCount / text.length;
+  const binaryRatio = binaryCount / text.length;
+  
+  // Text is readable if it has high printable ratio and low binary ratio
+  return printableRatio >= MIN_READABLE_RATIO && binaryRatio <= MAX_BINARY_RATIO;
 }
 
 /**
@@ -181,9 +228,11 @@ export function validateExtractedText(text: string): {
   warning: TextValidationWarning;
   characterCount: number;
   keywordCount: number;
+  isReadable: boolean;
 } {
   const characterCount = text.trim().length;
   const keywordCount = getContractKeywordCount(text);
+  const readable = isReadableText(text);
   
   // Check 1: Text length (HARD STOP)
   if (!validateTextLength(text)) {
@@ -192,20 +241,33 @@ export function validateExtractedText(text: string): {
       warning: null,
       characterCount,
       keywordCount,
+      isReadable: readable,
     };
   }
   
-  // Check 2: Language (HARD STOP)
+  // Check 2: Text is readable - not binary/junk (HARD STOP)
+  if (!readable) {
+    return {
+      error: 'unreadable_text',
+      warning: null,
+      characterCount,
+      keywordCount,
+      isReadable: false,
+    };
+  }
+  
+  // Check 3: Language (HARD STOP)
   if (!isEnglish(text)) {
     return {
       error: 'non_english',
       warning: null,
       characterCount,
       keywordCount,
+      isReadable: readable,
     };
   }
   
-  // Check 3: Contract-like heuristic (WARNING, not error)
+  // Check 4: Contract-like heuristic (WARNING, not error)
   const warning: TextValidationWarning = !isContractLike(text) ? 'not_contract_like' : null;
   
   return {
@@ -213,5 +275,6 @@ export function validateExtractedText(text: string): {
     warning,
     characterCount,
     keywordCount,
+    isReadable: readable,
   };
 }
