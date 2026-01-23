@@ -1,9 +1,10 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-founder-key",
 };
 
 // Fixed JSON response structure - Phase 3 requirement
@@ -21,10 +22,79 @@ interface AnalysisResponse {
   success: boolean;
   explanation?: ContractExplanation;
   error?: string;
+  errorCode?: string;
 }
 
 // Default value for missing/unclear content
 const DEFAULT_VALUE = "Not clearly specified in this contract.";
+
+// Founder bypass secret - set this in Supabase secrets
+const FOUNDER_KEY = Deno.env.get("FOUNDER_BYPASS_KEY") || "";
+
+/**
+ * Check if this is a founder/admin request that bypasses rate limits
+ */
+function isFounderRequest(req: Request): boolean {
+  if (!FOUNDER_KEY) return false;
+  const providedKey = req.headers.get("x-founder-key");
+  return providedKey === FOUNDER_KEY;
+}
+
+/**
+ * Check if fingerprint has been used today
+ * Returns true if already used (should block), false if available
+ */
+async function hasUsedToday(supabase: any, fingerprint: string): Promise<boolean> {
+  if (!fingerprint) return false; // Fail open if no fingerprint
+  
+  try {
+    // Get start of today in UTC
+    const now = new Date();
+    const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    
+    const { count, error } = await supabase
+      .from("usage_tracking")
+      .select("*", { count: "exact", head: true })
+      .eq("fingerprint", fingerprint)
+      .gte("used_at", startOfDay.toISOString());
+    
+    if (error) {
+      console.error("Error checking usage:", error);
+      return false; // Fail open
+    }
+    
+    return (count ?? 0) > 0;
+  } catch (error) {
+    console.error("Error in hasUsedToday:", error);
+    return false; // Fail open
+  }
+}
+
+/**
+ * Record usage for this fingerprint
+ */
+async function recordUsage(
+  supabase: any, 
+  fingerprint: string, 
+  ipAddress: string | null
+): Promise<void> {
+  if (!fingerprint) return;
+  
+  try {
+    const { error } = await supabase
+      .from("usage_tracking")
+      .insert({
+        fingerprint,
+        ip_address: ipAddress,
+      });
+    
+    if (error) {
+      console.error("Error recording usage:", error);
+    }
+  } catch (error) {
+    console.error("Error in recordUsage:", error);
+  }
+}
 
 // LOCKED SYSTEM PROMPT - V1.0.0
 // DO NOT MODIFY WITHOUT TESTING
@@ -120,6 +190,8 @@ serve(async (req) => {
 
   try {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
     // Check if API key exists
     if (!OPENAI_API_KEY) {
@@ -136,7 +208,11 @@ serve(async (req) => {
       );
     }
 
-    const { documentText } = await req.json();
+    // Create Supabase client for usage tracking
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+
+    const body = await req.json();
+    const { documentText, fingerprint } = body;
 
     if (!documentText || documentText.trim().length === 0) {
       return new Response(
@@ -151,10 +227,35 @@ serve(async (req) => {
       );
     }
 
+    // Get client IP for additional tracking
+    const clientIP = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+
+    // Check for founder bypass
+    const isFounder = isFounderRequest(req);
+    
+    // Server-side rate limiting (unless founder)
+    if (!isFounder && fingerprint) {
+      const alreadyUsed = await hasUsedToday(supabase, fingerprint);
+      if (alreadyUsed) {
+        console.log(`Rate limit hit for fingerprint: ${fingerprint.substring(0, 10)}...`);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "You've used your free explanation for today. Upgrade to Pro for unlimited access.",
+            errorCode: "RATE_LIMIT_EXCEEDED",
+          } as AnalysisResponse),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
     // User prompt - ONLY the contract text, no extra instructions
     const userPrompt = documentText;
 
-    console.log(`Processing document with ${documentText.length} characters`);
+    console.log(`Processing document with ${documentText.length} characters (founder: ${isFounder})`);
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -318,6 +419,12 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    // Record usage AFTER successful analysis (unless founder)
+    if (!isFounder && fingerprint) {
+      await recordUsage(supabase, fingerprint, clientIP);
+      console.log(`Recorded usage for fingerprint: ${fingerprint.substring(0, 10)}...`);
     }
 
     return new Response(
