@@ -18,7 +18,7 @@ import DebugPanel from "@/components/DebugPanel";
 
 const Processing = () => {
   const navigate = useNavigate();
-  const { file, fileName, setSections, setError, setIsAnalyzing, reset } = useDocumentStore();
+  const { file, fileName, setExplanation, setError, setIsAnalyzing, reset } = useDocumentStore();
   
   // Processing states
   const [processingError, setProcessingError] = useState<string | null>(null);
@@ -108,29 +108,31 @@ const Processing = () => {
 
   const sendToAI = async (text: string) => {
     try {
+      // Phase 3: Send ONLY the document text, no extra metadata
       const { data, error } = await supabase.functions.invoke("analyze-document", {
-        body: { documentText: text, fileName },
+        body: { documentText: text },
       });
 
       if (error) {
         console.error("Edge function error:", error);
-        setProcessingError("We're unable to analyze your document right now. Please try again later.");
+        setProcessingError("We couldn't confidently analyze this contract right now. Please try again in a moment.");
         setError("Analysis failed");
         return;
       }
 
       if (!data.success) {
-        setProcessingError(data.error || "Something went wrong. Please try again.");
+        // Use the exact error from backend (Phase 3 compliant messages)
+        setProcessingError(data.error || "We couldn't confidently analyze this contract right now. Please try again in a moment.");
         setError(data.error);
         return;
       }
 
-      // Success - store sections and navigate
-      setSections(data.sections);
+      // Success - store explanation (Phase 3 fixed structure) and navigate
+      setExplanation(data.explanation);
       navigate("/explanation");
     } catch (err) {
       console.error("AI analysis error:", err);
-      setProcessingError("Something went wrong. Please try again later.");
+      setProcessingError("We couldn't confidently analyze this contract right now. Please try again in a moment.");
       setError("Analysis failed");
     }
   };
