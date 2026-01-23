@@ -77,6 +77,8 @@ const UpgradeModal = ({ isOpen, onClose }: UpgradeModalProps) => {
       }
 
       // Sync to Google Sheets (fire and forget - don't block user)
+      // Note: The edge function validates that this email exists in the database
+      // and uses server-side timestamps and fixed source values for security
       try {
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         fetch(`${supabaseUrl}/functions/v1/sync-to-sheets`, {
@@ -84,9 +86,7 @@ const UpgradeModal = ({ isOpen, onClose }: UpgradeModalProps) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email: trimmedEmail,
-            name: trimmedName,
-            source: "Pro Request – Beta",
-            submittedAt
+            name: trimmedName
           })
         }).catch(err => console.error("Google Sheets sync failed:", err));
       } catch {
