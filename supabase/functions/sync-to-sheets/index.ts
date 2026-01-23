@@ -1,10 +1,32 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// Allowed origins for CORS - restrict to known domains
+const ALLOWED_ORIGINS = [
+  'https://simple-doc-sense.lovable.app',
+  'http://localhost:5173',
+  'http://localhost:8080',
+];
+
+// Allow Lovable preview domains
+function isLovablePreview(origin: string): boolean {
+  return /^https:\/\/.*\.lovable\.app$/.test(origin);
+}
+
+function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  if (isLovablePreview(origin)) return true;
+  return false;
+}
+
+function getCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('origin');
+  return {
+    'Access-Control-Allow-Origin': isOriginAllowed(origin) ? origin! : '',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+}
 
 interface ProAccessRequest {
   email: string;
@@ -192,9 +214,21 @@ async function appendToSheet(
 // ============= Main Handler =============
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+  
+  // Reject requests from disallowed origins
+  const origin = req.headers.get('origin');
+  if (origin && !isOriginAllowed(origin)) {
+    console.warn(`Rejected sync request from disallowed origin: ${origin}`);
+    return new Response(
+      JSON.stringify({ success: false, error: "Origin not allowed" }),
+      { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 
   try {

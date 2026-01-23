@@ -2,10 +2,37 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-founder-key",
-};
+// Allowed origins for CORS - restrict to known domains
+const ALLOWED_ORIGINS = [
+  'https://simple-doc-sense.lovable.app',
+  'http://localhost:5173',
+  'http://localhost:8080',
+];
+
+// Allow Lovable preview domains
+function isLovablePreview(origin: string): boolean {
+  return /^https:\/\/.*\.lovable\.app$/.test(origin);
+}
+
+function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  if (isLovablePreview(origin)) return true;
+  return false;
+}
+
+function getCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('origin');
+  return {
+    "Access-Control-Allow-Origin": isOriginAllowed(origin) ? origin! : '',
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-founder-key",
+  };
+}
+
+// Input validation constants
+const MAX_DOCUMENT_LENGTH = 500000; // 500KB - prevents excessive OpenAI token consumption
+const MAX_FINGERPRINT_LENGTH = 100;
+const FINGERPRINT_PATTERN = /^fp_[a-z0-9]+$/;
 
 // Fixed JSON response structure - Phase 3 requirement
 interface ContractExplanation {
@@ -183,9 +210,21 @@ Return a JSON object with EXACTLY these 7 keys. Every key MUST exist. Every valu
 - Do NOT include any text before or after the JSON`;
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+  
+  // Reject requests from disallowed origins
+  const origin = req.headers.get('origin');
+  if (origin && !isOriginAllowed(origin)) {
+    console.warn(`Rejected request from disallowed origin: ${origin}`);
+    return new Response(
+      JSON.stringify({ success: false, error: "Origin not allowed" }),
+      { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 
   try {
@@ -214,17 +253,56 @@ serve(async (req) => {
     const body = await req.json();
     const { documentText, fingerprint } = body;
 
-    if (!documentText || documentText.trim().length === 0) {
+    // ============= Input Validation =============
+    
+    // Validate documentText type
+    if (!documentText || typeof documentText !== 'string') {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid document content provided.",
+        } as AnalysisResponse),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate documentText is not empty
+    if (documentText.trim().length === 0) {
       return new Response(
         JSON.stringify({
           success: false,
           error: "No document content provided. Please upload a valid document.",
         } as AnalysisResponse),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Validate documentText length to prevent resource exhaustion
+    if (documentText.length > MAX_DOCUMENT_LENGTH) {
+      console.warn(`Document too large: ${documentText.length} chars (max: ${MAX_DOCUMENT_LENGTH})`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Document too large. Please upload a smaller document (max 500KB of text).",
+          errorCode: "DOCUMENT_TOO_LARGE",
+        } as AnalysisResponse),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate fingerprint if provided (don't reject, just sanitize)
+    let validFingerprint = fingerprint;
+    if (fingerprint) {
+      if (typeof fingerprint !== 'string') {
+        console.warn('Invalid fingerprint type provided, treating as missing');
+        validFingerprint = null;
+      } else if (fingerprint.length > MAX_FINGERPRINT_LENGTH) {
+        console.warn('Fingerprint too long, treating as invalid');
+        validFingerprint = null;
+      } else if (!FINGERPRINT_PATTERN.test(fingerprint)) {
+        console.warn('Fingerprint does not match expected pattern');
+        // Still use it for rate limiting, but log the anomaly
+      }
     }
 
     // Get client IP for additional tracking
@@ -234,10 +312,10 @@ serve(async (req) => {
     const isFounder = isFounderRequest(req);
     
     // Server-side rate limiting (unless founder)
-    if (!isFounder && fingerprint) {
-      const alreadyUsed = await hasUsedToday(supabase, fingerprint);
+    if (!isFounder && validFingerprint) {
+      const alreadyUsed = await hasUsedToday(supabase, validFingerprint);
       if (alreadyUsed) {
-        console.log(`Rate limit hit for fingerprint: ${fingerprint.substring(0, 10)}...`);
+        console.log(`Rate limit hit for fingerprint: ${validFingerprint.substring(0, 10)}...`);
         return new Response(
           JSON.stringify({
             success: false,
@@ -422,9 +500,9 @@ serve(async (req) => {
     }
 
     // Record usage AFTER successful analysis (unless founder)
-    if (!isFounder && fingerprint) {
-      await recordUsage(supabase, fingerprint, clientIP);
-      console.log(`Recorded usage for fingerprint: ${fingerprint.substring(0, 10)}...`);
+    if (!isFounder && validFingerprint) {
+      await recordUsage(supabase, validFingerprint, clientIP);
+      console.log(`Recorded usage for fingerprint: ${validFingerprint.substring(0, 10)}...`);
     }
 
     return new Response(
