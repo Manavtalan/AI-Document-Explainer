@@ -8,6 +8,7 @@ import {
   validateExtractedText, 
   isEnglish as checkIsEnglish, 
   isContractLike as checkIsContractLike,
+  isReadableText as checkIsReadable,
   TextValidationError 
 } from "@/lib/fileValidation";
 import { safeExtractText } from "@/lib/textExtraction";
@@ -30,6 +31,8 @@ const Processing = () => {
   const [keywordCount, setKeywordCount] = useState(0);
   const [isEnglishText, setIsEnglishText] = useState(true);
   const [isContractLikeText, setIsContractLikeText] = useState(true);
+  const [isReadableText, setIsReadableText] = useState(true);
+  const [detectedFileType, setDetectedFileType] = useState("");
   
   // Prevent double-processing
   const hasStartedRef = useRef(false);
@@ -63,6 +66,10 @@ const Processing = () => {
         
         const text = extraction.text;
 
+        // Detect file type for debug panel
+        const fileExt = file.name.split('.').pop()?.toUpperCase() || 'UNKNOWN';
+        setDetectedFileType(fileExt);
+
         // Store extracted text for debug panel
         setExtractedText(text);
         
@@ -70,6 +77,7 @@ const Processing = () => {
         const validation = validateExtractedText(text);
         setCharacterCount(validation.characterCount);
         setKeywordCount(validation.keywordCount);
+        setIsReadableText(validation.isReadable);
         setIsEnglishText(checkIsEnglish(text));
         setIsContractLikeText(checkIsContractLike(text));
         
@@ -143,9 +151,6 @@ const Processing = () => {
     reset();
     navigate("/upload");
   };
-
-  // Determine what to show
-  const hasError = processingError || validationError;
 
   return (
     <div className="min-h-screen bg-background">
@@ -233,6 +238,8 @@ const Processing = () => {
         keywordCount={keywordCount}
         isEnglish={isEnglishText}
         isContractLike={isContractLikeText}
+        isReadable={isReadableText}
+        fileType={detectedFileType}
       />
     </div>
   );

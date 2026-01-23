@@ -7,6 +7,8 @@ interface DebugPanelProps {
   keywordCount: number;
   isEnglish: boolean;
   isContractLike: boolean;
+  isReadable: boolean;
+  fileType: string;
 }
 
 /**
@@ -19,6 +21,8 @@ const DebugPanel = ({
   keywordCount,
   isEnglish,
   isContractLike,
+  isReadable,
+  fileType,
 }: DebugPanelProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
@@ -51,6 +55,12 @@ const DebugPanel = ({
         {/* Expandable content */}
         {isExpanded && (
           <div className="p-3 border-t border-border/20 space-y-3">
+            {/* File Type */}
+            <div className="text-xs font-mono bg-background/10 rounded px-2 py-1">
+              <span className="text-muted-foreground">File Type:</span>{" "}
+              <span className="text-primary font-bold">{fileType}</span>
+            </div>
+            
             {/* Stats */}
             <div className="grid grid-cols-2 gap-2 text-xs font-mono">
               <div className="bg-background/10 rounded px-2 py-1">
@@ -62,13 +72,19 @@ const DebugPanel = ({
                 <span className="text-primary font-bold">{keywordCount}</span>
               </div>
               <div className="bg-background/10 rounded px-2 py-1">
+                <span className="text-muted-foreground">Readable:</span>{" "}
+                <span className={isReadable ? "text-green-400" : "text-red-400"}>
+                  {isReadable ? "✓ Yes" : "✗ No"}
+                </span>
+              </div>
+              <div className="bg-background/10 rounded px-2 py-1">
                 <span className="text-muted-foreground">English:</span>{" "}
                 <span className={isEnglish ? "text-green-400" : "text-red-400"}>
                   {isEnglish ? "✓ Yes" : "✗ No"}
                 </span>
               </div>
-              <div className="bg-background/10 rounded px-2 py-1">
-                <span className="text-muted-foreground">Contract:</span>{" "}
+              <div className="col-span-2 bg-background/10 rounded px-2 py-1">
+                <span className="text-muted-foreground">Contract-like:</span>{" "}
                 <span className={isContractLike ? "text-green-400" : "text-yellow-400"}>
                   {isContractLike ? "✓ Yes" : "⚠ Maybe"}
                 </span>
