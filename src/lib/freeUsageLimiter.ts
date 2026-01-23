@@ -3,7 +3,10 @@
  * 
  * Tracks daily free usage via localStorage.
  * Soft limit - fails open if localStorage unavailable.
+ * Respects Founder Mode - bypasses all limits when enabled.
  */
+
+import { isFounderMode } from './founderMode';
 
 const STORAGE_KEY = 'free_explanation_last_used_date';
 
@@ -40,6 +43,11 @@ function isLocalStorageAvailable(): boolean {
  * returns false (allow usage) to never accidentally block legitimate users.
  */
 export function hasUsedFreeToday(): boolean {
+  // Founder Mode: always allow usage
+  if (isFounderMode()) {
+    return false;
+  }
+  
   try {
     if (!isLocalStorageAvailable()) {
       console.warn('localStorage unavailable - allowing free usage');
@@ -65,6 +73,11 @@ export function hasUsedFreeToday(): boolean {
  * Call this ONLY after successful explanation generation
  */
 export function markFreeUsageUsed(): void {
+  // Founder Mode: don't track usage
+  if (isFounderMode()) {
+    return;
+  }
+  
   try {
     if (!isLocalStorageAvailable()) {
       console.warn('localStorage unavailable - cannot mark usage');
