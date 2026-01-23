@@ -65,6 +65,30 @@ export type Database = {
         }
         Relationships: []
       }
+      usage_tracking: {
+        Row: {
+          created_at: string
+          fingerprint: string
+          id: string
+          ip_address: string | null
+          used_at: string
+        }
+        Insert: {
+          created_at?: string
+          fingerprint: string
+          id?: string
+          ip_address?: string | null
+          used_at?: string
+        }
+        Update: {
+          created_at?: string
+          fingerprint?: string
+          id?: string
+          ip_address?: string | null
+          used_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

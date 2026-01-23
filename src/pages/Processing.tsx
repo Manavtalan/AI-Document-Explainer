@@ -13,10 +13,11 @@ import {
 } from "@/lib/fileValidation";
 import { safeExtractText } from "@/lib/textExtraction";
 import { markFreeUsageUsed } from "@/lib/freeUsageLimiter";
+import { getFingerprint } from "@/lib/fingerprint";
+import { isFounderMode } from "@/lib/founderMode";
 import ValidationError from "@/components/ValidationError";
 import ContractWarningModal from "@/components/ContractWarningModal";
 import DebugPanel from "@/components/DebugPanel";
-
 // Phase 4: Rotating loading messages
 const LOADING_MESSAGES = [
   "Analyzing your contract…",
@@ -188,9 +189,20 @@ const Processing = () => {
 
   const sendToAI = async (text: string) => {
     try {
-      // Phase 3: Send ONLY the document text, no extra metadata
+      // Get browser fingerprint for server-side rate limiting
+      const fingerprint = getFingerprint();
+      
+      // Build request headers (include founder key if in founder mode)
+      const headers: Record<string, string> = {};
+      if (isFounderMode()) {
+        // In founder mode, we pass a header that the edge function can check
+        // The actual bypass key should be set as a secret in Supabase
+        headers["x-founder-key"] = import.meta.env.VITE_FOUNDER_BYPASS_KEY || "";
+      }
+      
       const { data, error } = await supabase.functions.invoke("analyze-document", {
-        body: { documentText: text },
+        body: { documentText: text, fingerprint },
+        headers,
       });
 
       // Clear timeout on response
@@ -203,6 +215,14 @@ const Processing = () => {
         return;
       }
 
+      // Check for rate limit error specifically
+      if (!data.success && data.errorCode === "RATE_LIMIT_EXCEEDED") {
+        // Server detected this fingerprint already used today
+        setProcessingError(data.error);
+        setError("Rate limit exceeded");
+        return;
+      }
+
       if (!data.success) {
         // Use the exact error from backend (Phase 3 compliant messages)
         setProcessingError(data.error || "We couldn't confidently analyze this contract right now. Please try again.");
@@ -210,7 +230,7 @@ const Processing = () => {
         return;
       }
 
-      // Success - Task 5.1: Mark free usage as used ONLY on success
+      // Success - Also mark local storage (as backup/fast path)
       markFreeUsageUsed();
       
       // Store explanation and navigate with minimum time
