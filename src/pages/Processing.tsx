@@ -12,6 +12,7 @@ import {
   TextValidationError 
 } from "@/lib/fileValidation";
 import { safeExtractText } from "@/lib/textExtraction";
+import { markFreeUsageUsed } from "@/lib/freeUsageLimiter";
 import ValidationError from "@/components/ValidationError";
 import ContractWarningModal from "@/components/ContractWarningModal";
 import DebugPanel from "@/components/DebugPanel";
@@ -208,7 +209,10 @@ const Processing = () => {
         return;
       }
 
-      // Success - store explanation and navigate with minimum time
+      // Success - Task 5.1: Mark free usage as used ONLY on success
+      markFreeUsageUsed();
+      
+      // Store explanation and navigate with minimum time
       setExplanation(data.explanation);
       await navigateWithMinTime();
     } catch (err) {
