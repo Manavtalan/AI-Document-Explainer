@@ -36,10 +36,12 @@ export const SECTION_ORDER: (keyof ContractExplanation)[] = [
 interface DocumentState {
   file: File | null;
   fileName: string | null;
+  extractedText: string | null;
   explanation: ContractExplanation | null;
   error: string | null;
   isAnalyzing: boolean;
   setFile: (file: File | null) => void;
+  setExtractedText: (text: string) => void;
   setExplanation: (explanation: ContractExplanation) => void;
   setError: (error: string | null) => void;
   setIsAnalyzing: (isAnalyzing: boolean) => void;
@@ -49,12 +51,14 @@ interface DocumentState {
 export const useDocumentStore = create<DocumentState>((set) => ({
   file: null,
   fileName: null,
+  extractedText: null,
   explanation: null,
   error: null,
   isAnalyzing: false,
   setFile: (file) => set({ file, fileName: file?.name ?? null, error: null }),
+  setExtractedText: (extractedText) => set({ extractedText }),
   setExplanation: (explanation) => set({ explanation, isAnalyzing: false }),
   setError: (error) => set({ error, isAnalyzing: false }),
   setIsAnalyzing: (isAnalyzing) => set({ isAnalyzing }),
-  reset: () => set({ file: null, fileName: null, explanation: null, error: null, isAnalyzing: false }),
+  reset: () => set({ file: null, fileName: null, extractedText: null, explanation: null, error: null, isAnalyzing: false }),
 }));

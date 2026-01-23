@@ -34,7 +34,7 @@ const MESSAGE_ROTATION_INTERVAL_MS = 3000; // Rotate message every 3 seconds
 
 const Processing = () => {
   const navigate = useNavigate();
-  const { file, fileName, setExplanation, setError, setIsAnalyzing, reset } = useDocumentStore();
+  const { file, fileName, setExtractedText: storeExtractedText, setExplanation, setError, setIsAnalyzing, reset } = useDocumentStore();
   
   // Processing states
   const [processingError, setProcessingError] = useState<string | null>(null);
@@ -147,8 +147,9 @@ const Processing = () => {
         const fileExt = file.name.split('.').pop()?.toUpperCase() || 'UNKNOWN';
         setDetectedFileType(fileExt);
 
-        // Store extracted text for debug panel
+        // Store extracted text for debug panel and complexity analysis
         setExtractedText(text);
+        storeExtractedText(text);
         
         // Step 2: Run all validation checks
         const validation = validateExtractedText(text);

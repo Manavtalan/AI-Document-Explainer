@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
-import { FileText, Copy, Download, Check, Lock, AlertTriangle } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { FileText, Copy, Download, Check, Lock, AlertTriangle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { useDocumentStore, SECTION_LABELS, SECTION_ORDER, ContractExplanation } from "@/hooks/useDocumentAnalysis";
+import { analyzeComplexity, ComplexityLevel } from "@/lib/complexityAnalyzer";
 
 /**
  * Phase 4: Content Renderer
@@ -65,9 +66,15 @@ const ContentRenderer = ({ content }: { content: string }) => {
  */
 const Explanation = () => {
   const navigate = useNavigate();
-  const { explanation, fileName, reset } = useDocumentStore();
+  const { explanation, fileName, extractedText, reset } = useDocumentStore();
   const [copied, setCopied] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  // Task 4.2: Calculate complexity from extracted text
+  const complexity: ComplexityLevel = useMemo(() => {
+    if (!extractedText) return "Simple";
+    return analyzeComplexity(extractedText);
+  }, [extractedText]);
 
   // Redirect if no explanation available
   useEffect(() => {
@@ -158,6 +165,29 @@ const Explanation = () => {
                   ({fileName})
                 </span>
               )}
+            </p>
+          </div>
+
+          {/* Task 4.2: Complexity Indicator */}
+          <div className="mb-6 flex items-center gap-2 text-sm">
+            <Info className="w-4 h-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Contract complexity:</span>
+            <span className={`font-medium ${
+              complexity === 'Complex' 
+                ? 'text-amber-600 dark:text-amber-400' 
+                : complexity === 'Moderate' 
+                  ? 'text-primary' 
+                  : 'text-green-600 dark:text-green-400'
+            }`}>
+              {complexity}
+            </span>
+          </div>
+
+          {/* Task 5: Scope Disclaimer - before explanation sections */}
+          <div className="mb-6 p-3 bg-muted/30 rounded-lg border border-border/30">
+            <p className="text-xs text-muted-foreground text-center">
+              This explanation highlights major terms and risks.<br />
+              Minor administrative clauses may not be covered.
             </p>
           </div>
 

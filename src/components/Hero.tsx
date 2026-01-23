@@ -15,16 +15,16 @@ const Hero = () => {
           </div>
         </div>
 
-        {/* Headline */}
+        {/* Headline - Task 11: Minimal landing page */}
         <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-semibold text-foreground leading-tight mb-6 animate-fade-in">
           Upload a contract.
           <br />
-          Understand it clearly.
+          Understand it in seconds.
         </h1>
 
-        {/* Subheading */}
+        {/* Subheading - Task 11: No jargon, no chat */}
         <p className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto mb-10 animate-fade-in" style={{ animationDelay: "0.1s" }}>
-          Get a plain-English explanation of any contract in seconds. No legal jargon. No prompts needed.
+          No chat. No prompts. No legal jargon.
         </p>
 
         {/* CTA */}

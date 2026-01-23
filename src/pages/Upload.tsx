@@ -16,6 +16,7 @@ const UploadPage = () => {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [validationError, setValidationError] = useState<FileValidationError>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedDocType, setSelectedDocType] = useState<string | null>(null);
   const { setFile } = useDocumentStore();
 
   const handleFileValidation = useCallback((file: File): boolean => {
@@ -72,11 +73,15 @@ const UploadPage = () => {
 
   const handleAnalyze = () => {
     if (!localFile) return;
-    setShowDocTypeModal(true);
+    handleOpenDocTypeModal();
+  };
+
+  const handleSelectDocType = (type: string) => {
+    setSelectedDocType(type);
   };
 
   const handleDocTypeConfirm = () => {
-    if (!localFile) return;
+    if (!localFile || selectedDocType !== 'contract') return;
     
     // Task 5.1: Check free usage limit BEFORE proceeding
     if (hasUsedFreeToday()) {
@@ -89,6 +94,11 @@ const UploadPage = () => {
     setFile(localFile);
     setShowDocTypeModal(false);
     navigate("/processing");
+  };
+
+  const handleOpenDocTypeModal = () => {
+    setSelectedDocType(null); // Reset selection each time
+    setShowDocTypeModal(true);
   };
 
   return (
@@ -213,10 +223,14 @@ const UploadPage = () => {
             </p>
 
             <div className="space-y-3">
-              {/* Contract - enabled */}
+              {/* Contract - selectable */}
               <button
-                onClick={handleDocTypeConfirm}
-                className="w-full p-4 text-left rounded-xl border border-primary bg-sage/30 hover:bg-sage/50 transition-colors"
+                onClick={() => handleSelectDocType('contract')}
+                className={`w-full p-4 text-left rounded-xl border transition-colors ${
+                  selectedDocType === 'contract' 
+                    ? 'border-primary bg-sage/50 ring-2 ring-primary/20' 
+                    : 'border-border hover:border-primary/50 hover:bg-sage/20'
+                }`}
               >
                 <span className="font-medium text-foreground">✅ Contract</span>
               </button>
@@ -245,9 +259,25 @@ const UploadPage = () => {
               </button>
             </div>
 
+            {/* Scope copy - Task 7 */}
+            <p className="mt-4 text-xs text-muted-foreground text-center">
+              This version explains contracts only.<br />
+              Other document types are coming soon.
+            </p>
+
+            {/* Continue button - disabled by default */}
+            <Button
+              variant="hero"
+              className="w-full mt-6"
+              onClick={handleDocTypeConfirm}
+              disabled={selectedDocType !== 'contract'}
+            >
+              Continue
+            </Button>
+
             <button
               onClick={() => setShowDocTypeModal(false)}
-              className="mt-6 w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="mt-3 w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               Cancel
             </button>
