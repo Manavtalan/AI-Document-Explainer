@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,9 +9,70 @@ const corsHeaders = {
 interface ProAccessRequest {
   email: string;
   name: string | null;
-  source: string;
-  submittedAt: string;
 }
+
+// ============= Input Validation & Sanitization =============
+
+/**
+ * Validates email format server-side
+ */
+function isValidEmail(email: string): boolean {
+  if (!email || typeof email !== 'string') return false;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.length <= 254;
+}
+
+/**
+ * Sanitizes input to prevent CSV/formula injection in Google Sheets
+ * Prefixes dangerous characters with single quote to prevent formula execution
+ */
+function sanitizeForSheets(value: string, maxLength: number = 500): string {
+  if (!value || typeof value !== 'string') return '';
+  
+  // Prevent formula injection by prefixing with single quote if starts with dangerous chars
+  let sanitized = value;
+  if (/^[=+\-@\t\r]/.test(sanitized)) {
+    sanitized = "'" + sanitized;
+  }
+  
+  // Trim and limit length
+  return sanitized.substring(0, maxLength).trim();
+}
+
+/**
+ * Validates that a request originated from our application by checking
+ * the database for a matching pro_access_request entry
+ */
+async function validateRequestExists(email: string): Promise<boolean> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error("Missing Supabase credentials for validation");
+    return false;
+  }
+  
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  
+  // Check if a pro_access_request with this email was created in the last 5 minutes
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  
+  const { data, error } = await supabase
+    .from('pro_access_requests')
+    .select('id')
+    .eq('email', email.toLowerCase().trim())
+    .gte('created_at', fiveMinutesAgo)
+    .limit(1);
+  
+  if (error) {
+    console.error("Error validating request:", error);
+    return false;
+  }
+  
+  return data && data.length > 0;
+}
+
+// ============= Google Sheets Authentication =============
 
 /**
  * Generate a JWT for Google Sheets API authentication
@@ -32,17 +94,13 @@ async function createGoogleJWT(clientEmail: string, privateKey: string): Promise
   const unsignedToken = `${headerB64}.${payloadB64}`;
 
   // Fix: Handle escaped newlines in private key (common when stored as env var)
-  // Also handle case where key might be double-escaped or have different escaping
   let formattedPrivateKey = privateKey;
-  
-  // Handle various newline escape formats
-  formattedPrivateKey = formattedPrivateKey.replace(/\\\\n/g, '\n'); // double-escaped
-  formattedPrivateKey = formattedPrivateKey.replace(/\\n/g, '\n');   // single-escaped
+  formattedPrivateKey = formattedPrivateKey.replace(/\\\\n/g, '\n');
+  formattedPrivateKey = formattedPrivateKey.replace(/\\n/g, '\n');
   
   // Parse the private key - handle both with and without headers
   let pemContents = formattedPrivateKey;
   
-  // Remove PEM headers/footers if present
   if (pemContents.includes('-----BEGIN')) {
     pemContents = pemContents
       .replace(/-----BEGIN PRIVATE KEY-----/g, "")
@@ -51,11 +109,7 @@ async function createGoogleJWT(clientEmail: string, privateKey: string): Promise
       .replace(/-----END RSA PRIVATE KEY-----/g, "");
   }
   
-  // Clean up whitespace and newlines
   pemContents = pemContents.replace(/[\n\r\s]/g, "").trim();
-  
-  // Debug: Log key length to verify it's being parsed
-  console.log(`Private key parsed, base64 length: ${pemContents.length}`);
   
   if (pemContents.length < 100) {
     throw new Error(`Private key appears malformed (length: ${pemContents.length}). Please re-enter the full private key from your service account JSON file.`);
@@ -115,7 +169,7 @@ async function appendToSheet(
   spreadsheetId: string,
   values: string[]
 ): Promise<void> {
-  const range = "Sheet1!A:E"; // Columns: Name, Email, Date, Action, Notes
+  const range = "Sheet1!A:E";
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`;
 
   const response = await fetch(url, {
@@ -135,6 +189,8 @@ async function appendToSheet(
   }
 }
 
+// ============= Main Handler =============
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -142,7 +198,7 @@ serve(async (req) => {
   }
 
   try {
-    // Get secrets
+    // Get Google Sheets secrets
     const clientEmail = Deno.env.get("GOOGLE_SHEETS_CLIENT_EMAIL");
     const privateKey = Deno.env.get("GOOGLE_SHEETS_PRIVATE_KEY");
     const spreadsheetId = Deno.env.get("GOOGLE_SHEETS_SPREADSHEET_ID");
@@ -156,7 +212,6 @@ serve(async (req) => {
     }
     
     // Check if private key looks valid (should be ~1700+ chars when properly stored)
-    // Clean the key first before checking length
     const cleanedKeyLength = privateKey
       .replace(/-----BEGIN.*?-----/g, "")
       .replace(/-----END.*?-----/g, "")
@@ -164,7 +219,7 @@ serve(async (req) => {
       .length;
     
     if (cleanedKeyLength < 1000) {
-      console.error(`Google Sheets private key appears truncated (${cleanedKeyLength} chars). Sync disabled until key is properly configured.`);
+      console.error(`Google Sheets private key appears truncated (${cleanedKeyLength} chars). Sync disabled.`);
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -175,14 +230,46 @@ serve(async (req) => {
       );
     }
 
-    // Parse request body
-    const body: ProAccessRequest = await req.json();
-    const { email, name, source, submittedAt } = body;
-
-    if (!email) {
+    // Parse and validate request body
+    let body: ProAccessRequest;
+    try {
+      body = await req.json();
+    } catch {
       return new Response(
-        JSON.stringify({ success: false, error: "Email is required" }),
+        JSON.stringify({ success: false, error: "Invalid JSON body" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    const { email, name } = body;
+
+    // ============= Server-Side Validation =============
+    
+    // Validate email format
+    if (!email || !isValidEmail(email)) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid email format" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Validate name length if provided
+    if (name && (typeof name !== 'string' || name.length > 200)) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Name too long (max 200 characters)" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // ============= Authorization: Verify Database Entry Exists =============
+    // This ensures only legitimate requests (that went through our frontend 
+    // and successfully inserted into the database) can trigger the sync
+    const isValid = await validateRequestExists(email);
+    if (!isValid) {
+      console.warn(`Rejected sync request - no matching database entry for: ${email}`);
+      return new Response(
+        JSON.stringify({ success: false, error: "Unauthorized request" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -192,13 +279,15 @@ serve(async (req) => {
     const jwt = await createGoogleJWT(clientEmail, privateKey);
     const accessToken = await getGoogleAccessToken(jwt);
 
-    // Append row to sheet - matching columns: Name, Email, Date, Action, Notes
+    // ============= Sanitized & Server-Controlled Values =============
+    // Use server-side timestamp (don't trust client)
+    // Use fixed source value (don't accept from client)
     const rowValues = [
-      name || "",                              // Column A: Name
-      email,                                   // Column B: Email
-      submittedAt || new Date().toISOString(), // Column C: Date
-      source || "Pro Request – Beta",          // Column D: Action
-      "",                                      // Column E: Notes (empty)
+      sanitizeForSheets(name || "", 200),           // Column A: Name (sanitized)
+      sanitizeForSheets(email.toLowerCase(), 254),  // Column B: Email (sanitized, lowercase)
+      new Date().toISOString(),                     // Column C: Date (server-side timestamp)
+      "Pro Request – Beta",                         // Column D: Action (server-controlled)
+      "",                                           // Column E: Notes (empty)
     ];
 
     await appendToSheet(accessToken, spreadsheetId, rowValues);
@@ -211,9 +300,9 @@ serve(async (req) => {
     );
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error syncing to Google Sheets:", error);
+    console.error("Error syncing to Google Sheets:", errorMessage);
     return new Response(
-      JSON.stringify({ success: false, error: errorMessage }),
+      JSON.stringify({ success: false, error: "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
