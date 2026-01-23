@@ -31,11 +31,15 @@ async function createGoogleJWT(clientEmail: string, privateKey: string): Promise
   const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
   const unsignedToken = `${headerB64}.${payloadB64}`;
 
+  // Fix: Handle escaped newlines in private key (common when stored as env var)
+  const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
+  
   // Parse the private key
-  const pemContents = privateKey
+  const pemContents = formattedPrivateKey
     .replace(/-----BEGIN PRIVATE KEY-----/, "")
     .replace(/-----END PRIVATE KEY-----/, "")
-    .replace(/\n/g, "");
+    .replace(/\n/g, "")
+    .trim();
   
   const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
   
@@ -91,7 +95,7 @@ async function appendToSheet(
   spreadsheetId: string,
   values: string[]
 ): Promise<void> {
-  const range = "Sheet1!A:D"; // Columns: Email, Name, Source, Submitted At
+  const range = "Sheet1!A:E"; // Columns: Name, Email, Date, Action, Notes
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`;
 
   const response = await fetch(url, {
@@ -148,12 +152,13 @@ serve(async (req) => {
     const jwt = await createGoogleJWT(clientEmail, privateKey);
     const accessToken = await getGoogleAccessToken(jwt);
 
-    // Append row to sheet
+    // Append row to sheet - matching columns: Name, Email, Date, Action, Notes
     const rowValues = [
-      email,
-      name || "",
-      source || "Pro Request – Beta",
-      submittedAt || new Date().toISOString(),
+      name || "",                              // Column A: Name
+      email,                                   // Column B: Email
+      submittedAt || new Date().toISOString(), // Column C: Date
+      source || "Pro Request – Beta",          // Column D: Action
+      "",                                      // Column E: Notes (empty)
     ];
 
     await appendToSheet(accessToken, spreadsheetId, rowValues);
