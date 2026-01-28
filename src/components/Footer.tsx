@@ -12,7 +12,7 @@ const Footer = () => {
               <FileText className="w-4 h-4 text-primary-foreground" />
             </div>
             <span className="font-serif text-lg font-semibold text-foreground">
-              iLoveDocs<span className="text-primary">.ai</span>
+              DocBrief <span className="text-primary">AI</span>
             </span>
           </Link>
 
@@ -35,7 +35,7 @@ const Footer = () => {
 
         <div className="mt-8 pt-8 border-t border-border/50 text-center">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} iLoveDocs.ai. All rights reserved.
+            © {new Date().getFullYear()} DocBrief AI. All rights reserved.
           </p>
         </div>
       </div>
