@@ -12,7 +12,7 @@ import {
   TextValidationError 
 } from "@/lib/fileValidation";
 import { safeExtractText } from "@/lib/textExtraction";
-import { markFreeUsageUsed } from "@/lib/freeUsageLimiter";
+
 import { getFingerprint } from "@/lib/fingerprint";
 import { isFounderMode } from "@/lib/founderMode";
 import ValidationError from "@/components/ValidationError";
@@ -230,9 +230,6 @@ const Processing = () => {
         return;
       }
 
-      // Success - Also mark local storage (as backup/fast path)
-      markFreeUsageUsed();
-      
       // Store explanation and navigate with minimum time
       setExplanation(data.explanation);
       await navigateWithMinTime();
