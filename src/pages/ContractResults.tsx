@@ -3,14 +3,14 @@ import { FileText, Copy, Check, ArrowLeft, AlertTriangle, ChevronDown, Search } 
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { useOfferLetterStore } from "@/hooks/useOfferLetterStore";
-import CompensationSummary from "@/components/offer-letter/CompensationSummary";
-import SectionBreakdown from "@/components/offer-letter/SectionBreakdown";
-import ChatPanel from "@/components/offer-letter/ChatPanel";
+import { useContractStore } from "@/hooks/useContractStore";
+import KeyTermsSummary from "@/components/contract/KeyTermsSummary";
+import ContractSectionBreakdown from "@/components/contract/ContractSectionBreakdown";
+import ContractChatPanel from "@/components/contract/ContractChatPanel";
 
-const OfferLetterResults = () => {
+const ContractResults = () => {
   const navigate = useNavigate();
-  const { analysis, fileName, reset } = useOfferLetterStore();
+  const { analysis, fileName, reset } = useContractStore();
   const [copied, setCopied] = useState(false);
   const [glossarySearch, setGlossarySearch] = useState("");
   const [showGlossary, setShowGlossary] = useState(false);
@@ -39,16 +39,16 @@ const OfferLetterResults = () => {
 
   const handleCopySummary = () => {
     if (!analysis) return;
-    const s = analysis.total_compensation_summary;
-    const text = `Offer Letter Analysis — ${analysis.role_title} at ${analysis.company_name}
+    const s = analysis.key_terms_summary;
+    const text = `Contract Analysis — ${analysis.contract_title}
 
-Base Salary: ${s.base_salary?.annual || "N/A"}
-Equity: ${s.equity?.total_grant || "None"} (${s.equity?.type || ""})
-Signing Bonus: ${s.signing_bonus?.amount || "None"}
-Performance Bonus: ${s.performance_bonus?.target || "None"}
-Benefits: ${s.benefits_estimate?.annual_value || "N/A"}
+Parties: ${analysis.party_a} & ${analysis.party_b}
+Contract Value: ${s.contract_value?.amount || "N/A"}
+Payment Terms: ${s.payment_schedule?.terms || "N/A"}
+Effective Date: ${s.effective_date?.date || "N/A"}
+Termination Date: ${s.termination_date?.date || "N/A"}
+Governing Law: ${s.governing_law?.jurisdiction || "N/A"}
 
-Total Year 1: ${s.total_year_1 || "N/A"}
 Red Flags: ${redCount} | Caution Items: ${yellowCount} | Missing Items: ${missingCount}
 
 Analyzed by DocBrief AI`;
@@ -66,8 +66,8 @@ Analyzed by DocBrief AI`;
 
   if (!analysis) return null;
 
-  // Not an offer letter
-  if (analysis.document_type_detected === "not_offer_letter") {
+  // Not a contract
+  if (analysis.document_type_detected === "not_contract") {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
         <div className="text-center max-w-md">
@@ -75,15 +75,12 @@ Analyzed by DocBrief AI`;
             <AlertTriangle className="w-10 h-10 text-foreground" />
           </div>
           <h1 className="text-2xl font-serif font-semibold mb-3">
-            This doesn't look like an offer letter
+            This doesn't look like a contract
           </h1>
           <p className="text-muted-foreground mb-8">
-            {analysis.sections?.[0]?.explanation || "The uploaded document doesn't appear to be a job offer letter."}
+            {analysis.sections?.[0]?.explanation || "The uploaded document doesn't appear to be a contract or legal agreement."}
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button variant="warm" onClick={() => navigate("/upload")}>
-              Try Contract Explainer →
-            </Button>
             <Button variant="soft" onClick={() => { reset(); navigate("/upload"); }}>
               Upload a different file
             </Button>
@@ -127,11 +124,14 @@ Analyzed by DocBrief AI`;
           {/* Title */}
           <div className="mb-8">
             <h1 className="text-2xl md:text-3xl font-serif font-semibold mb-2">
-              {analysis.role_title} at {analysis.company_name}
+              {analysis.contract_title || "Contract Analysis"}
             </h1>
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
                 AI Confidence: {analysis.confidence_score}%
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-xs">
+                {analysis.document_type_detected?.replace(/_/g, " ")}
               </span>
               <span>Analyzed on {new Date().toLocaleDateString()}</span>
               {fileName && <span className="truncate max-w-[200px]">({fileName})</span>}
@@ -143,14 +143,18 @@ Analyzed by DocBrief AI`;
             <div className="mb-6 p-4 rounded-xl bg-accent border border-border flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-foreground flex-shrink-0 mt-0.5" />
               <p className="text-sm text-foreground">
-                <strong>Low Confidence:</strong> Our AI is less certain about this analysis (confidence: {analysis.confidence_score}%). Some sections may be inaccurate. We recommend verifying key terms directly with your employer.
+                <strong>Low Confidence:</strong> Our AI is less certain about this analysis (confidence: {analysis.confidence_score}%). Some sections may be inaccurate. We recommend verifying key terms directly with the other party.
               </p>
             </div>
           )}
 
-          {/* Total Compensation Summary */}
+          {/* Key Terms Summary */}
           <div className="mb-8">
-            <CompensationSummary summary={analysis.total_compensation_summary} />
+            <KeyTermsSummary
+              summary={analysis.key_terms_summary}
+              partyA={analysis.party_a}
+              partyB={analysis.party_b}
+            />
           </div>
 
           {/* Quick Alerts Bar */}
@@ -177,7 +181,7 @@ Analyzed by DocBrief AI`;
           {/* Section Breakdown */}
           {analysis.sections && analysis.sections.length > 0 && (
             <div className="mb-10">
-              <SectionBreakdown sections={analysis.sections} />
+              <ContractSectionBreakdown sections={analysis.sections} />
             </div>
           )}
 
@@ -223,7 +227,7 @@ Analyzed by DocBrief AI`;
           {/* Missing Items */}
           {missingCount > 0 && (
             <div id="missing-items" className="mb-10 scroll-mt-20">
-              <h2 className="text-lg font-serif font-semibold mb-4">📋 Missing From Your Offer</h2>
+              <h2 className="text-lg font-serif font-semibold mb-4">📋 Missing From Your Contract</h2>
               <div className="rounded-xl bg-muted/50 border border-border p-5 space-y-4">
                 {analysis.missing_items.map((item, i) => (
                   <div key={i}>
@@ -232,7 +236,7 @@ Analyzed by DocBrief AI`;
                   </div>
                 ))}
                 <p className="text-xs text-muted-foreground italic pt-2 border-t border-border/50">
-                  Consider asking your employer about these items before signing.
+                  Consider discussing these items with the other party before signing.
                 </p>
               </div>
             </div>
@@ -241,10 +245,7 @@ Analyzed by DocBrief AI`;
           {/* Glossary */}
           {analysis.glossary && analysis.glossary.length > 0 && (
             <div className="mb-8">
-              <button
-                onClick={() => setShowGlossary(!showGlossary)}
-                className="flex items-center gap-2 w-full text-left"
-              >
+              <button onClick={() => setShowGlossary(!showGlossary)} className="flex items-center gap-2 w-full text-left">
                 <h2 className="text-lg font-serif font-semibold">📖 Jargon Glossary</h2>
                 <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${showGlossary ? "rotate-180" : ""}`} />
               </button>
@@ -276,10 +277,7 @@ Analyzed by DocBrief AI`;
           {/* Negotiation Tips */}
           {analysis.negotiation_tips && analysis.negotiation_tips.length > 0 && (
             <div className="mb-8">
-              <button
-                onClick={() => setShowTips(!showTips)}
-                className="flex items-center gap-2 w-full text-left"
-              >
+              <button onClick={() => setShowTips(!showTips)} className="flex items-center gap-2 w-full text-left">
                 <h2 className="text-lg font-serif font-semibold">💡 Negotiation Tips</h2>
                 <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${showTips ? "rotate-180" : ""}`} />
               </button>
@@ -293,7 +291,7 @@ Analyzed by DocBrief AI`;
                     </div>
                   ))}
                   <p className="text-xs text-muted-foreground italic mt-3">
-                    These are general suggestions based on your offer letter. Consider consulting a career advisor for personalized negotiation strategy.
+                    These are general suggestions based on your contract. Consider consulting a legal professional for personalized advice.
                   </p>
                 </div>
               )}
@@ -303,7 +301,7 @@ Analyzed by DocBrief AI`;
           {/* Legal Disclaimer */}
           <div className="mt-10 p-4 bg-muted/50 rounded-xl border border-border/30">
             <p className="text-xs text-muted-foreground text-center leading-relaxed">
-              ⚖️ <strong>Disclaimer:</strong> DocBrief provides educational explanations only. This is not legal, financial, or tax advice. Always consult a qualified attorney or financial advisor before making decisions. AI analysis may contain errors — verify critical terms directly with your employer.
+              ⚖️ <strong>Disclaimer:</strong> DocBrief provides educational explanations only. This is not legal, financial, or tax advice. Always consult a qualified attorney before making decisions. AI analysis may contain errors — verify critical terms directly with the other party.
             </p>
           </div>
 
@@ -317,9 +315,9 @@ Analyzed by DocBrief AI`;
       </main>
 
       {/* Q&A Chat Panel */}
-      <ChatPanel />
+      <ContractChatPanel />
     </div>
   );
 };
 
-export default OfferLetterResults;
+export default ContractResults;

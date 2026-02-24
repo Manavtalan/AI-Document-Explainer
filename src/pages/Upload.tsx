@@ -3,6 +3,7 @@ import { FileText, Upload as UploadIcon, X, ArrowRight, FileCheck } from "lucide
 import { Button } from "@/components/ui/button";
 import { useNavigate, Link } from "react-router-dom";
 import { useDocumentStore } from "@/hooks/useDocumentAnalysis";
+import { useOfferLetterStore } from "@/hooks/useOfferLetterStore";
 import { validateFile, FileValidationError, ALLOWED_EXTENSIONS, MAX_FILE_SIZE_MB } from "@/lib/fileValidation";
 import ValidationError from "@/components/ValidationError";
 
@@ -16,6 +17,7 @@ const UploadPage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedDocType, setSelectedDocType] = useState<string | null>(null);
   const { setFile } = useDocumentStore();
+  const { setFile: setOfferLetterFile } = useOfferLetterStore();
 
   const handleFileValidation = useCallback((file: File): boolean => {
     setValidationError(null);
@@ -79,12 +81,18 @@ const UploadPage = () => {
   };
 
   const handleDocTypeConfirm = () => {
-    if (!localFile || selectedDocType !== 'contract') return;
+    if (!localFile || !selectedDocType) return;
     
     setIsProcessing(true);
     setFile(localFile);
     setShowDocTypeModal(false);
-    navigate("/processing");
+
+    if (selectedDocType === 'contract') {
+      navigate("/processing");
+    } else if (selectedDocType === 'offer-letter') {
+      setOfferLetterFile(localFile);
+      navigate("/offer-letter-processing");
+    }
   };
 
   const handleOpenDocTypeModal = () => {
@@ -111,10 +119,10 @@ const UploadPage = () => {
       <main className="py-16 px-4">
         <div className="container mx-auto max-w-xl">
           <h1 className="text-3xl font-serif font-semibold text-center mb-2">
-            Upload your contract
+            Upload your document
           </h1>
           <p className="text-muted-foreground text-center mb-10">
-            We'll analyze it and give you a clear explanation
+            We'll analyze it and give you a clear, plain-English explanation
           </p>
 
           {/* Validation Error */}
@@ -166,7 +174,7 @@ const UploadPage = () => {
                   <UploadIcon className="w-8 h-8 text-primary" />
                 </div>
                 <p className="font-medium text-foreground mb-2">
-                  Drag & drop your contract here
+                  Drag & drop your document here
                 </p>
                 <p className="text-sm text-muted-foreground mb-4">
                   or click to browse
@@ -194,7 +202,7 @@ const UploadPage = () => {
                 onClick={handleAnalyze}
                 disabled={isProcessing}
               >
-                {isProcessing ? "Processing..." : "Upload Contract"}
+                {isProcessing ? "Processing..." : "Upload Document"}
                 {!isProcessing && <ArrowRight className="w-5 h-5 ml-2" />}
               </Button>
             </div>
@@ -207,10 +215,10 @@ const UploadPage = () => {
         <div className="fixed inset-0 bg-foreground/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-background rounded-2xl p-8 max-w-md w-full shadow-calm border border-border/50">
             <h2 className="text-xl font-serif font-semibold mb-2">
-              What kind of document is this?
+              What type of document is this?
             </h2>
             <p className="text-sm text-muted-foreground mb-6">
-              Select the type that best matches your document
+              We'll tailor the analysis to your document type
             </p>
 
             <div className="space-y-3">
@@ -226,13 +234,16 @@ const UploadPage = () => {
                 <span className="font-medium text-foreground">✅ Contract</span>
               </button>
               
-              {/* Offer Letter - links to dedicated page */}
+              {/* Offer Letter - selectable */}
               <button
-                onClick={() => { setShowDocTypeModal(false); navigate("/offer-letter-explainer"); }}
-                className="w-full p-4 text-left rounded-xl border border-border hover:border-primary/50 hover:bg-sage/20 transition-colors"
+                onClick={() => handleSelectDocType('offer-letter')}
+                className={`w-full p-4 text-left rounded-xl border transition-colors ${
+                  selectedDocType === 'offer-letter' 
+                    ? 'border-primary bg-sage/50 ring-2 ring-primary/20' 
+                    : 'border-border hover:border-primary/50 hover:bg-sage/20'
+                }`}
               >
                 <span className="font-medium text-foreground">📄 Offer Letter</span>
-                <span className="text-xs text-primary font-semibold ml-2">NEW</span>
               </button>
               {/* Coming soon options - disabled */}
               <button
@@ -251,18 +262,17 @@ const UploadPage = () => {
               </button>
             </div>
 
-            {/* Scope copy - Task 7 */}
             <p className="mt-4 text-xs text-muted-foreground text-center">
-              This version explains contracts only.<br />
+              We support contracts and offer letters.<br />
               Other document types are coming soon.
             </p>
 
-            {/* Continue button - disabled by default */}
+            {/* Continue button */}
             <Button
               variant="hero"
               className="w-full mt-6"
               onClick={handleDocTypeConfirm}
-              disabled={selectedDocType !== 'contract'}
+              disabled={!selectedDocType || selectedDocType === 'bank-letter' || selectedDocType === 'legal-notice'}
             >
               Continue
             </Button>
