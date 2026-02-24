@@ -5,15 +5,13 @@ import { useNavigate, Link } from "react-router-dom";
 import { useDocumentStore } from "@/hooks/useDocumentAnalysis";
 import { validateFile, FileValidationError, ALLOWED_EXTENSIONS, MAX_FILE_SIZE_MB } from "@/lib/fileValidation";
 import ValidationError from "@/components/ValidationError";
-import UpgradeModal from "@/components/UpgradeModal";
-import { hasUsedFreeToday } from "@/lib/freeUsageLimiter";
 
 const UploadPage = () => {
   const navigate = useNavigate();
   const [localFile, setLocalFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showDocTypeModal, setShowDocTypeModal] = useState(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  
   const [validationError, setValidationError] = useState<FileValidationError>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedDocType, setSelectedDocType] = useState<string | null>(null);
@@ -82,13 +80,6 @@ const UploadPage = () => {
 
   const handleDocTypeConfirm = () => {
     if (!localFile || selectedDocType !== 'contract') return;
-    
-    // Task 5.1: Check free usage limit BEFORE proceeding
-    if (hasUsedFreeToday()) {
-      setShowDocTypeModal(false);
-      setShowUpgradeModal(true);
-      return;
-    }
     
     setIsProcessing(true);
     setFile(localFile);
@@ -285,11 +276,6 @@ const UploadPage = () => {
         </div>
       )}
 
-      {/* Task 5.2: Upgrade Modal */}
-      <UpgradeModal 
-        isOpen={showUpgradeModal} 
-        onClose={() => setShowUpgradeModal(false)} 
-      />
     </div>
   );
 };

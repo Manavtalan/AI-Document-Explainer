@@ -18,9 +18,9 @@ const Footer = () => {
 
           {/* Links */}
           <nav className="flex items-center gap-8">
-            <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              About
-            </a>
+            <Link to="/about" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              About Us
+            </Link>
             <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Privacy Policy
             </a>

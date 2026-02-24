@@ -18,9 +18,9 @@ const Header = () => {
           <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             How it works
           </a>
-          <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            Pricing
-          </a>
+          <Link to="/about" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            About Us
+          </Link>
         </nav>
       </div>
     </header>

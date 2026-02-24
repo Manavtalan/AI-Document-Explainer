@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { FileText, Copy, Download, Check, Lock, AlertTriangle, Info } from "lucide-react";
+import { FileText, Copy, Download, Check, AlertTriangle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
@@ -77,7 +77,7 @@ const Explanation = () => {
     sessionStorage.setItem("doc_session_id", newId);
     return newId;
   }, []);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  
 
   // Task 4.2: Calculate complexity from extracted text
   const complexity: ComplexityLevel = useMemo(() => {
@@ -114,7 +114,8 @@ const Explanation = () => {
   };
 
   const handleDownload = () => {
-    setShowUpgradeModal(true);
+    // TODO: Implement PDF download
+    toast({ title: "PDF download coming soon!" });
   };
 
   const handleUploadAnother = () => {
@@ -252,34 +253,6 @@ const Explanation = () => {
         </div>
       </main>
 
-      {/* Upgrade Modal */}
-      {showUpgradeModal && (
-        <div className="fixed inset-0 bg-foreground/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-2xl p-8 max-w-md w-full shadow-calm border border-border/50 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-sage mx-auto flex items-center justify-center mb-6">
-              <Lock className="w-8 h-8 text-primary" />
-            </div>
-            
-            <h2 className="text-xl font-serif font-semibold mb-2">
-              Save and share this explanation
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              Upgrade to Pro to download your explanation as a PDF
-            </p>
-
-            <Button variant="hero" className="w-full mb-3">
-              Upgrade to Pro — $9/month
-            </Button>
-            
-            <button
-              onClick={() => setShowUpgradeModal(false)}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Maybe later
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

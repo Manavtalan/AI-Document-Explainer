@@ -8,6 +8,7 @@ import UploadPage from "./pages/Upload";
 import Processing from "./pages/Processing";
 import Explanation from "./pages/Explanation";
 import NotFound from "./pages/NotFound";
+import AboutUs from "./pages/AboutUs";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/upload" element={<UploadPage />} />
           <Route path="/processing" element={<Processing />} />
           <Route path="/explanation" element={<Explanation />} />
+          <Route path="/about" element={<AboutUs />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

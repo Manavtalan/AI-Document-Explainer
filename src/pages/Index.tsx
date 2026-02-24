@@ -3,7 +3,7 @@ import Hero from "@/components/Hero";
 import HowItWorks from "@/components/HowItWorks";
 import ValueSection from "@/components/ValueSection";
 import TrustSection from "@/components/TrustSection";
-import PricingSection from "@/components/PricingSection";
+
 import Footer from "@/components/Footer";
 
 const Index = () => {
@@ -15,7 +15,7 @@ const Index = () => {
         <HowItWorks />
         <ValueSection />
         <TrustSection />
-        <PricingSection />
+        
       </main>
       <Footer />
     </div>
