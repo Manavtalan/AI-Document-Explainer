@@ -226,14 +226,15 @@ const UploadPage = () => {
                 <span className="font-medium text-foreground">✅ Contract</span>
               </button>
               
-              {/* Coming soon options - disabled */}
+              {/* Offer Letter - links to dedicated page */}
               <button
-                disabled
-                className="w-full p-4 text-left rounded-xl border border-border bg-muted/50 opacity-60 cursor-not-allowed"
+                onClick={() => { setShowDocTypeModal(false); navigate("/offer-letter-explainer"); }}
+                className="w-full p-4 text-left rounded-xl border border-border hover:border-primary/50 hover:bg-sage/20 transition-colors"
               >
-                <span className="font-medium text-muted-foreground">🔒 Offer Letter</span>
-                <span className="text-xs text-muted-foreground ml-2">(Coming soon)</span>
+                <span className="font-medium text-foreground">📄 Offer Letter</span>
+                <span className="text-xs text-primary font-semibold ml-2">NEW</span>
               </button>
+              {/* Coming soon options - disabled */}
               <button
                 disabled
                 className="w-full p-4 text-left rounded-xl border border-border bg-muted/50 opacity-60 cursor-not-allowed"
