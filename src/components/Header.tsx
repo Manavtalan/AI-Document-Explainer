@@ -18,9 +18,8 @@ const Header = () => {
           <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             How it works
           </a>
-          <Link to="/offer-letter-explainer" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
-            Offer Letter Explainer
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground">NEW</span>
+          <Link to="/upload" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            Upload Document
           </Link>
           <Link to="/about" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             About Us
