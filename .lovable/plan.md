@@ -1,21 +1,60 @@
 
 
-# Add Favicon
+# Remove Pricing/Paywall and Add About Us Page
 
 ## Overview
-Copy the uploaded image to the public directory and update `index.html` to use it as the site favicon.
+Remove all pricing and paywall functionality from DocBrief AI and replace with an About Us page.
 
-## Steps
+## What Gets Removed
 
-1. **Copy the image** from `user-uploads://Black_White_Modern_Monogram_CR_Logo_Design.png` to `public/favicon.png`
-2. **Update `index.html`** to add a `<link rel="icon">` tag pointing to `/favicon.png`
+### Pricing & Paywall Components
+- **`src/components/PricingSection.tsx`** -- Remove the pricing section from the homepage
+- **`src/components/UpgradeModal.tsx`** -- Remove the upgrade/paywall modal
+- **`src/lib/freeUsageLimiter.ts`** -- Remove the free usage limiter logic
+
+### References Cleaned Up
+- **`src/pages/Index.tsx`** -- Remove PricingSection import and usage
+- **`src/pages/Upload.tsx`** -- Remove UpgradeModal, free usage limit check, and related state
+- **`src/pages/Processing.tsx`** -- Remove `markFreeUsageUsed()` call
+- **`src/pages/Explanation.tsx`** -- Remove upgrade modal and download paywall logic
+- **`src/components/Header.tsx`** -- Replace "Pricing" nav link with "About Us" link
+
+## What Gets Added
+
+### New About Us Page (`src/pages/AboutUs.tsx`)
+A clean, informative page with:
+- Header and Footer (reusing existing components)
+- Mission statement section
+- What DocBrief AI does
+- Team/company vision
+
+### Routing & Navigation Updates
+- **`src/App.tsx`** -- Add `/about` route
+- **`src/components/Header.tsx`** -- Change "Pricing" link to "About Us" pointing to `/about`
+- **`src/components/Footer.tsx`** -- Update "About" link to point to `/about`
 
 ## Technical Details
 
-In `index.html`, add inside `<head>`:
-```html
-<link rel="icon" href="/favicon.png" type="image/png" />
-```
+### Files to create
+| File | Description |
+|------|-------------|
+| `src/pages/AboutUs.tsx` | New About Us page with mission, features, and vision sections |
 
-This replaces the existing `public/favicon.ico` reference (if any) with the new PNG favicon.
+### Files to modify
+| File | Change |
+|------|--------|
+| `src/App.tsx` | Add `/about` route |
+| `src/pages/Index.tsx` | Remove PricingSection |
+| `src/pages/Upload.tsx` | Remove UpgradeModal and free usage checks |
+| `src/pages/Processing.tsx` | Remove `markFreeUsageUsed` import and call |
+| `src/pages/Explanation.tsx` | Remove upgrade modal state and inline modal |
+| `src/components/Header.tsx` | Replace Pricing link with About Us link |
+| `src/components/Footer.tsx` | Update About link to `/about` |
+
+### Files to delete
+| File | Reason |
+|------|--------|
+| `src/components/PricingSection.tsx` | No longer needed |
+| `src/components/UpgradeModal.tsx` | No longer needed |
+| `src/lib/freeUsageLimiter.ts` | No longer needed |
 
