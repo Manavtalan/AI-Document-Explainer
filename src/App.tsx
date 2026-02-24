@@ -9,6 +9,9 @@ import Processing from "./pages/Processing";
 import Explanation from "./pages/Explanation";
 import NotFound from "./pages/NotFound";
 import AboutUs from "./pages/AboutUs";
+import OfferLetterUpload from "./pages/OfferLetterUpload";
+import OfferLetterProcessing from "./pages/OfferLetterProcessing";
+import OfferLetterResults from "./pages/OfferLetterResults";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +27,9 @@ const App = () => (
           <Route path="/processing" element={<Processing />} />
           <Route path="/explanation" element={<Explanation />} />
           <Route path="/about" element={<AboutUs />} />
+          <Route path="/offer-letter-explainer" element={<OfferLetterUpload />} />
+          <Route path="/offer-letter-processing" element={<OfferLetterProcessing />} />
+          <Route path="/offer-letter-results" element={<OfferLetterResults />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
