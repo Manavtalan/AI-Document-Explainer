@@ -14,7 +14,7 @@ const Header = () => {
           </span>
         </Link>
         
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden md:flex items-center gap-6">
           <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             How it works
           </a>

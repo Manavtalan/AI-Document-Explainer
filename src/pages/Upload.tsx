@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate, Link } from "react-router-dom";
 import { useDocumentStore } from "@/hooks/useDocumentAnalysis";
 import { useOfferLetterStore } from "@/hooks/useOfferLetterStore";
+import { useLeaseStore } from "@/hooks/useLeaseStore";
 import { validateFile, FileValidationError, ALLOWED_EXTENSIONS, MAX_FILE_SIZE_MB } from "@/lib/fileValidation";
 import ValidationError from "@/components/ValidationError";
 
@@ -18,6 +19,7 @@ const UploadPage = () => {
   const [selectedDocType, setSelectedDocType] = useState<string | null>(null);
   const { setFile } = useDocumentStore();
   const { setFile: setOfferLetterFile } = useOfferLetterStore();
+  const { setFile: setLeaseFile } = useLeaseStore();
 
   const handleFileValidation = useCallback((file: File): boolean => {
     setValidationError(null);
@@ -92,6 +94,9 @@ const UploadPage = () => {
     } else if (selectedDocType === 'offer-letter') {
       setOfferLetterFile(localFile);
       navigate("/offer-letter-processing");
+    } else if (selectedDocType === 'lease-agreement') {
+      setLeaseFile(localFile);
+      navigate("/lease-processing");
     }
   };
 
@@ -245,14 +250,21 @@ const UploadPage = () => {
               >
                 <span className="font-medium text-foreground">📄 Offer Letter</span>
               </button>
-              {/* Coming soon options - disabled */}
+              
+              {/* Lease Agreement - selectable */}
               <button
-                disabled
-                className="w-full p-4 text-left rounded-xl border border-border bg-muted/50 opacity-60 cursor-not-allowed"
+                onClick={() => handleSelectDocType('lease-agreement')}
+                className={`w-full p-4 text-left rounded-xl border transition-colors ${
+                  selectedDocType === 'lease-agreement' 
+                    ? 'border-teal-500 bg-teal-50/50 dark:bg-teal-900/20 ring-2 ring-teal-500/20' 
+                    : 'border-border hover:border-teal-500/50 hover:bg-teal-50/20'
+                }`}
               >
-                <span className="font-medium text-muted-foreground">🔒 Bank Letter</span>
-                <span className="text-xs text-muted-foreground ml-2">(Coming soon)</span>
+                <span className="font-medium text-foreground">🏠 Lease Agreement</span>
+                <span className="text-xs text-teal-600 ml-2 font-medium">NEW</span>
               </button>
+
+              {/* Coming soon options - disabled */}
               <button
                 disabled
                 className="w-full p-4 text-left rounded-xl border border-border bg-muted/50 opacity-60 cursor-not-allowed"
@@ -263,7 +275,7 @@ const UploadPage = () => {
             </div>
 
             <p className="mt-4 text-xs text-muted-foreground text-center">
-              We support contracts and offer letters.<br />
+              We support contracts, offer letters, and lease agreements.<br />
               Other document types are coming soon.
             </p>
 

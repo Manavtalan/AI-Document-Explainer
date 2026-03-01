@@ -13,6 +13,8 @@ import OfferLetterProcessing from "./pages/OfferLetterProcessing";
 import OfferLetterResults from "./pages/OfferLetterResults";
 import ContractProcessing from "./pages/ContractProcessing";
 import ContractResults from "./pages/ContractResults";
+import LeaseProcessing from "./pages/LeaseProcessing";
+import LeaseResults from "./pages/LeaseResults";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +35,10 @@ const App = () => (
           <Route path="/offer-letter-explainer" element={<Navigate to="/upload" replace />} />
           <Route path="/offer-letter-processing" element={<OfferLetterProcessing />} />
           <Route path="/offer-letter-results" element={<OfferLetterResults />} />
+          {/* Lease Agreement routes */}
+          <Route path="/lease-agreement-explainer" element={<Navigate to="/upload" replace />} />
+          <Route path="/lease-processing" element={<LeaseProcessing />} />
+          <Route path="/lease-results" element={<LeaseResults />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
